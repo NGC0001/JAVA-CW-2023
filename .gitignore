@@ -1,3 +1,15 @@
+# Database persistence directory
+cw-db/databases/
+
+# Java build directory
+target/
+
+# maven cache
+.mvn/
+
+# Vim temporary files
+*.swp
+
 # Compiled class file
 *.class
 
