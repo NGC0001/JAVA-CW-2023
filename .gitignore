@@ -4,9 +4,6 @@ cw-db/databases/
 # Java build directory
 target/
 
-# maven cache
-.mvn/
-
 # Vim temporary files
 *.swp
 

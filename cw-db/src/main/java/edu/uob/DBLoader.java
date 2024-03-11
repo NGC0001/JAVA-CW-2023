@@ -21,7 +21,7 @@ public class DBLoader {
                 .filter(path -> isTableFileName(path.getFileName().toString()))
                 .map(path -> path.toFile()) // throws RuntimeException:UnsupportedOperationException
                 .filter(file -> file.isFile()) // throws RuntimeException:SecurityException
-                .map(file -> loadTableFile(file))
+                .map(file -> loadTableFromFile(file))
                 .filter(table -> table != null)
                 .collect(Collectors.toList());
             tables.forEach(table -> System.out.println(table));
@@ -37,7 +37,7 @@ public class DBLoader {
         return true;
     }
 
-    private static Table loadTableFile(File file) {
+    private static Table loadTableFromFile(File file) {
         Table table = null;
         // FileReader throws IOException
         try (FileReader fileReader = new FileReader(file);
