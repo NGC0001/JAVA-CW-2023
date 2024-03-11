@@ -9,16 +9,32 @@ import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** This class reads databases from files. */
-public class DBLoader {
-    public static void loadFrom(String storageFolderPath) {
+public class DBStorage {
+    private static final String tableFileNameSuffix = "tab";
+
+    private static boolean isValidTableFileName(String filename) {
+      Pattern tableFileNamePattern = Pattern.compile("(.+)\\.(.+)\\." + tableFileNameSuffix);
+      Matcher tableFileNameMatcher = tableFileNamePattern.matcher(filename);
+      if (!tableFileNameMatcher.matches()) { return false; }
+      String dabaseName = tableFileNameMatcher.group(1);
+      String tableName = tableFileNameMatcher.group(2);
+      if (!dabaseName.equals(dabaseName.toLowerCase())) { return false; } // ensure lowercase
+      if (!tableName.equals(tableName.toLowerCase())) { return false; } // ensure lowercase
+      return Grammar.isValidDatabaseName(dabaseName) && Grammar.isValidTableName(tableName);
+    }
+
+    public static void loadDatabasesFrom(String storageFolderPath) {
+        if (storageFolderPath == null) { return; }
         try {
             // Paths.get throws RuntimeException:InvalidPathException
             // Files.list throws IOException, RuntimeException:SecurityException
             List<Table> tables = Files.list(Paths.get(storageFolderPath))
-                .filter(path -> isTableFileName(path.getFileName().toString()))
+                .filter(path -> isValidTableFileName(path.getFileName().toString()))
                 .map(path -> path.toFile()) // throws RuntimeException:UnsupportedOperationException
                 .filter(file -> file.isFile()) // throws RuntimeException:SecurityException
                 .map(file -> loadTableFromFile(file))
@@ -30,11 +46,6 @@ public class DBLoader {
         } catch(Exception e) {
             System.err.println(e);
         }
-    }
-
-    // TODO
-    private static boolean isTableFileName(String filename) {
-        return true;
     }
 
     private static Table loadTableFromFile(File file) {

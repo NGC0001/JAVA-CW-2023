@@ -11,30 +11,15 @@ import java.util.regex.Pattern;
 
 /** This class represents a talbe of a database. */
 public class Table {
-  public static String idAttrName = "id";
-
-  public static class Entity {
-    private long id;
-    private ArrayList<String> attributes;
-
-    // TODO: validate
-    protected Entity(long id, Collection<? extends String> attributes) {
-      this.id = id;
-      this.attributes = new ArrayList<String>(attributes);
-    }
-
-    @Override
-    public String toString() {
-        String str = "" + id;
-        for (String attr : attributes) { str += " " + attr; }
-        return str;
-    }
-  }
-
   public static class TableException extends Exception {
     @Serial private static final long serialVersionUID = 1;
     public TableException(String message) {
         super(message);
+    }
+
+    public static class InvalidArgument extends TableException {
+        @Serial private static final long serialVersionUID = 1;
+        public InvalidArgument(String message) { super(message); }
     }
 
     public static class InvalidOrDuplicateAttributeName extends TableException {
@@ -55,9 +40,21 @@ public class Table {
     }
   }
 
-  // TODO
-  public static boolean isValidAttributeName(String attrName) {
-    return true; // != idAttrName, only letter/digit
+  public static class Entity {
+    private long id;
+    private ArrayList<String> attributes;
+
+    protected Entity(long id, Collection<? extends String> attributes) {
+      this.id = id;
+      this.attributes = new ArrayList<String>(attributes);
+    }
+
+    @Override
+    public String toString() {
+        String str = "" + id;
+        for (String attr : attributes) { str += " " + attr; }
+        return str;
+    }
   }
 
   private ArrayList<String> attrNames;
@@ -65,10 +62,12 @@ public class Table {
   private ArrayList<Entity> entities;
 
   public Table(Collection<? extends String> attrNames, long nextId) throws TableException {
+    if (attrNames == null) { throw new InvalidArgument("null attribute names for Table"); }
     HashSet<String> attrNameSet = new HashSet<String>();
     for (String attrName : attrNames) {
-        if (!isValidAttributeName(attrName)
-                || !attrNameSet.add(attrName.toLowerCase())) {
+        if (attrName == null
+            || !Grammar.isValidAttributeName(attrName)
+            || !attrNameSet.add(attrName.toLowerCase())) {
             throw new InvalidOrDuplicateAttributeName(attrName);
         }
     }
@@ -85,7 +84,9 @@ public class Table {
   }
 
   public static Table createFromString(String str) throws TableException {
-      Pattern tableStrPattern = Pattern.compile("id\\((\\d+)\\)(\\s.*)?", Pattern.DOTALL);
+      if (str == null) { throw new InvalidArgument("creating Table from null"); }
+      Pattern tableStrPattern = Pattern.compile(
+          Grammar.getIdAttrName() + "\\((\\d+)\\)(\\s.*)?", Pattern.DOTALL);
       Matcher tableStrMatcher = tableStrPattern.matcher(str.trim());
       if (!tableStrMatcher.matches()) {
           throw new MissingOrInvalidNextId();
@@ -99,12 +100,11 @@ public class Table {
       return new Table(Arrays.asList(attrNamesString.split("\\s+")), nextId);
   }
 
-  protected boolean addEntity(Entity entity) {
-    return entities.add(entity);
-  }
-
+  // TODO: validate id and attributes
   protected boolean addEntity(long id, Collection<? extends String> attributes) {
-    return addEntity(new Entity(id, attributes));
+    if (attributes == null) { return false; }
+    entities.add(new Entity(id, attributes));
+    return true;
   }
 
   public boolean addEntity(Collection<? extends String> attributes) {
@@ -113,11 +113,10 @@ public class Table {
   }
 
   public boolean addEntityFromString(String str) {
+      if (str == null) { return false; }
       Pattern entityStrPattern = Pattern.compile("(\\d+)(\\s.*)?", Pattern.DOTALL);
       Matcher entityStrMatcher = entityStrPattern.matcher(str.trim());
-      if (!entityStrMatcher.matches()) {
-          return false;
-      }
+      if (!entityStrMatcher.matches()) { return false; }
       long entityId = Long.parseLong(entityStrMatcher.group(1));
       String attributesString = entityStrMatcher.group(2);
       if (attributesString == null
@@ -129,7 +128,7 @@ public class Table {
 
   @Override
   public String toString() {
-      String str = "id(" + nextId + ")";
+      String str = Grammar.getIdAttrName() + "(" + nextId + ")";
       for (String attrName : attrNames) { str += " " + attrName; }
       for (Entity entity : entities) { str += "\n" + entity.toString(); }
       return str;
