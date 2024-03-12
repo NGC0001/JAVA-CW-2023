@@ -30,7 +30,8 @@ public class DBServer {
         try {
             // Create the database storage folder if it doesn't already exist !
             Files.createDirectories(Paths.get(storageFolderPath));
-            DBStorage.loadDatabasesFrom(storageFolderPath);
+            DBKeeper dbKeeper = DBKeeper.loadFromDirectory(storageFolderPath);
+            System.out.println(dbKeeper);
         } catch(IOException ioe) {
             System.out.println("Can't seem to create database storage folder " + storageFolderPath);
         }
