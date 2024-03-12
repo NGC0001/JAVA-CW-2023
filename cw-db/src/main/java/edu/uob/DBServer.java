@@ -16,6 +16,7 @@ public class DBServer {
 
     private static final char END_OF_TRANSMISSION = 4;
     private String storageFolderPath;
+    private DBKeeper dbKeeper;
 
     public static void main(String args[]) throws IOException {
         DBServer server = new DBServer();
@@ -27,14 +28,15 @@ public class DBServer {
     */
     public DBServer() {
         storageFolderPath = Paths.get("databases").toAbsolutePath().toString();
+        dbKeeper = new DBKeeper();
         try {
             // Create the database storage folder if it doesn't already exist !
             Files.createDirectories(Paths.get(storageFolderPath));
-            DBKeeper dbKeeper = DBKeeper.loadFromDirectory(storageFolderPath);
-            System.out.println(dbKeeper);
-        } catch(IOException ioe) {
-            System.out.println("Can't seem to create database storage folder " + storageFolderPath);
+            dbKeeper.loadFromDirectory(storageFolderPath);
+        } catch(Throwable throwedObj) {
+            System.out.println("error initialising server " + throwedObj);
         }
+        System.out.println(dbKeeper);
     }
 
     /**

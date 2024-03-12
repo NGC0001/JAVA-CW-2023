@@ -1,7 +1,5 @@
 package edu.uob;
 
-import edu.uob.Table.TableException.*;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -14,9 +12,9 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** This class represents a talbe of a database. */
+// This class represents a talbe of a database.
 public class Table {
-    public static class TableException extends Exception {
+    public static class TableException extends DBException {
         @Serial
         private static final long serialVersionUID = 1;
 
@@ -24,172 +22,309 @@ public class Table {
             super(message);
         }
 
-        public static class InvalidArgument extends TableException {
+        public static class InvalidAttributeNameException extends TableException {
             @Serial
             private static final long serialVersionUID = 1;
 
-            public InvalidArgument(String message) {
-                super(message);
+            public InvalidAttributeNameException(String attrName) {
+                super("invalid attribute name " + attrName);
+            }
+
+            public InvalidAttributeNameException(String attrName, String message) {
+                super("invalid attribute name " + attrName + ": " + message);
             }
         }
 
-        public static class InvalidOrDuplicateAttributeName extends TableException {
+        public static class NegativeNextIdException extends TableException {
             @Serial
             private static final long serialVersionUID = 1;
 
-            public InvalidOrDuplicateAttributeName(String attrName) {
-                super(attrName + " is invalid or duplicate for attribute name");
+            public NegativeNextIdException(long nextId) {
+                super("negative nextId " + nextId);
             }
         }
 
-        public static class MissingOrInvalidNextId extends TableException {
+        public static class InvalidTableStringException extends TableException {
             @Serial
             private static final long serialVersionUID = 1;
 
-            public MissingOrInvalidNextId(long id) {
-                super(id + " is invalid for nextId");
+            public InvalidTableStringException(String str) {
+                super("string does not represent a table: " + str);
             }
+        }
 
-            public MissingOrInvalidNextId() {
-                super("missing nextId");
+        public static class InvalidAttributeValueException extends TableException {
+            @Serial
+            private static final long serialVersionUID = 1;
+
+            public InvalidAttributeValueException(String attrValue) {
+                super("invalid attribute value " + attrValue);
+            }
+        }
+
+        public static class InvalidNumberOfAttributesException extends TableException {
+            @Serial
+            private static final long serialVersionUID = 1;
+
+            public InvalidNumberOfAttributesException(int expected, int actual) {
+                super("invalid attributes number, expected " + expected + ", actually " + actual);
+            }
+        }
+
+        public static class NegativeEntityIdException extends TableException {
+            @Serial
+            private static final long serialVersionUID = 1;
+
+            public NegativeEntityIdException(long id) {
+                super("negative entity id " + id);
+            }
+        }
+
+        public static class InvalidEntityStringException extends TableException {
+            @Serial
+            private static final long serialVersionUID = 1;
+
+            public InvalidEntityStringException(String str) {
+                super("string does not represent an entity: " + str);
             }
         }
     }
 
     public static class Entity {
-        private long id;
+        private final long id;
         private ArrayList<String> attributes;
 
-        protected Entity(long id, Collection<? extends String> attributes) {
+        protected Entity(long id) throws DBException {
+            if (id < 0) {
+                throw new TableException.NegativeEntityIdException(id);
+            }
             this.id = id;
-            this.attributes = new ArrayList<String>(attributes);
+            this.attributes = new ArrayList<String>();
+        }
+
+        protected void addAttribute(String attr) throws DBException {
+            if (!Grammar.isValidAttributeValue(attr)) {
+                throw new TableException.InvalidAttributeNameException(attr);
+            }
+            this.attributes.add(attr);
+        }
+
+        protected void addAttributes(Collection<? extends String> attributes) throws DBException {
+            if (attributes == null) {
+                throw new DBException.NullObjectException("null attributes to add");
+            }
+            for (String attr : attributes) {
+                addAttribute(attr);
+            }
         }
 
         @Override
         public String toString() {
-            String str = "" + id;
-            for (String attr : attributes) {
-                str += " " + attr;
+            return "(" + exportToString(",") + ")";
+        }
+
+        public String exportToString(String delim) {
+            if (delim == null) {
+                delim = " ";
+            }
+            String str = "" + this.id;
+            for (String attr : this.attributes) {
+                str += delim + attr;
             }
             return str;
         }
     }
 
-    private ArrayList<String> attrNames;
+    private static final char metaFormatBracketLeft = '<';
+    private static final char metaFormatBracketRight = '>';
+    private static final String metaFormatDelim = "|";
+
     private long nextId;
+    private HashSet<String> attrNameSet;
+    private ArrayList<String> attrNames;
     private ArrayList<Entity> entities;
 
-    public Table(Collection<? extends String> attrNames, long nextId) throws TableException {
-        if (attrNames == null) {
-            throw new InvalidArgument("null attribute names for Table");
-        }
-        HashSet<String> attrNameSet = new HashSet<String>();
-        for (String attrName : attrNames) {
-            if (attrName == null
-                    || !Grammar.isValidAttributeName(attrName)
-                    || !attrNameSet.add(attrName.toLowerCase())) {
-                throw new InvalidOrDuplicateAttributeName(attrName);
-            }
-        }
-        this.attrNames = new ArrayList<String>(attrNames);
+    public Table() throws DBException {
+        this(0);
+    }
+
+    public Table(long nextId) throws DBException {
         if (nextId < 0) {
-            throw new MissingOrInvalidNextId(nextId);
+            throw new TableException.NegativeNextIdException(nextId);
         }
         this.nextId = nextId;
+        this.attrNameSet = new HashSet<String>();
+        this.attrNames = new ArrayList<String>();
         this.entities = new ArrayList<Entity>();
     }
 
-    public Table(Collection<? extends String> attrNames) throws TableException {
-        this(attrNames, 0);
-    }
-
-    public static Table loadFromFile(File file) {
-        Table table = null;
-        // FileReader throws IOException
-        try (FileReader fileReader = new FileReader(file);
-                BufferedReader bufferedReader = new BufferedReader(fileReader)) {
-            String line = null;
-            while ((line = bufferedReader.readLine()) != null) { // throws IOException
-                if ((line = line.trim()).length() == 0) {
-                    continue;
-                }
-                if (table == null) {
-                    table = Table.createFromString(line);
-                    continue;
-                }
-                if (!table.addEntityFromString(line)) {
-                    System.err.println("failed to add entity from line: " + line);
-                }
-            }
-        } catch (TableException te) {
-            System.err.println("failed to create table from " + file.getPath() + ": " + te);
-            return null;
-        } catch (IOException ioe) {
-            System.err.println("while reading table from " + file.getPath() + ": " + ioe);
-            return null;
+    public static Table createFromMetaString(String meta) throws DBException {
+        if (meta == null) {
+            throw new DBException.NullObjectException("creating table from null meta");
         }
+        meta = meta.trim();
+        if (meta.length() < 2 || meta.charAt(0) != metaFormatBracketLeft
+                || meta.charAt(meta.length() - 1) != metaFormatBracketRight) {
+            throw new DBException.DatabaseStorageException(
+                    "ill-formatted meta string for table");
+        }
+        meta = meta.substring(1, meta.length() - 1);
+        String[] nextIdAndAttrNames = meta.split(":", 2);
+        if (nextIdAndAttrNames.length != 2) {
+            throw new DBException.DatabaseStorageException(
+                    "ill-formatted meta string for table");
+        }
+        String nextIdString = nextIdAndAttrNames[0].trim();
+        String attrNamesString = nextIdAndAttrNames[1];
+        long nextId = Long.parseLong(nextIdString);
+        Table table = new Table(nextId);
+        table.addAttrFieldsByString(attrNamesString, metaFormatDelim);
         return table;
     }
 
-    public static Table createFromString(String str) throws TableException {
-        if (str == null) {
-            throw new InvalidArgument("creating Table from null");
+    public void loadFromFile(File file) throws DBException, IOException {
+        if (file == null) {
+            throw new DBException.NullObjectException("null file for loading table");
         }
-        Pattern tableStrPattern = Pattern.compile(
-                Grammar.getIdAttrName() + "\\((\\d+)\\)(\\s.*)?", Pattern.DOTALL);
-        Matcher tableStrMatcher = tableStrPattern.matcher(str.trim());
-        if (!tableStrMatcher.matches()) {
-            throw new MissingOrInvalidNextId();
+        if (!file.isFile()) {
+            throw new DBException.DatabaseStorageException(
+                    "cannot find table file " + file.getPath());
         }
-        long nextId = Long.parseLong(tableStrMatcher.group(1));
-        String attrNamesString = tableStrMatcher.group(2);
-        if (attrNamesString == null
-                || (attrNamesString = attrNamesString.trim()).length() == 0) {
-            return new Table(new ArrayList<String>(), nextId);
+        try (BufferedReader bufReader = new BufferedReader(new FileReader(file))) {
+            String line = null;
+            while ((line = bufReader.readLine()) != null && (line = line.trim()).length() == 0) {
+            }
+            if (!validateTableHeader(Arrays.asList(line.split("\\s+")))) {
+                throw new DBException.DatabaseStorageException(
+                        "invalid table header in " + file.getPath());
+            }
+            while ((line = bufReader.readLine()) != null) {
+                if ((line = line.trim()).length() == 0) {
+                    continue;
+                }
+                addEntityFromString(line);
+            }
         }
-        return new Table(Arrays.asList(attrNamesString.split("\\s+")), nextId);
     }
 
-    // TODO: validate id and attributes
-    protected boolean addEntity(long id, Collection<? extends String> attributes) {
-        if (attributes == null) {
+    public boolean validateTableHeader(Collection<? extends String> headerFields) {
+        if (getNumberOfAttrFields() + 1 != headerFields.size()) {
             return false;
         }
-        entities.add(new Entity(id, attributes));
+        int fieldIdx = 0;
+        for (String field : headerFields) {
+            field = field.toLowerCase();
+            if (fieldIdx == 0 && !Grammar.getIdAttrName().equals(field)) {
+                return false;
+            }
+            if (fieldIdx > 0 && !this.attrNames.get(fieldIdx - 1).toLowerCase().equals(field)) {
+                return false;
+            }
+            fieldIdx++;
+        }
         return true;
     }
 
-    public boolean addEntity(Collection<? extends String> attributes) {
-        long newId = this.nextId++;
-        return addEntity(newId, attributes);
+    public long getNextId() {
+        return this.nextId;
     }
 
-    public boolean addEntityFromString(String str) {
-        if (str == null) {
-            return false;
+    public void addAttrFieldsByString(String attrNamesString, String delim) throws DBException {
+        if (attrNamesString == null || delim == null) {
+            throw new DBException.NullObjectException(
+                    "null arguments while adding attributes by string");
         }
-        Pattern entityStrPattern = Pattern.compile("(\\d+)(\\s.*)?", Pattern.DOTALL);
-        Matcher entityStrMatcher = entityStrPattern.matcher(str.trim());
+        attrNamesString = attrNamesString.trim();
+        if (attrNamesString.length() == 0) {
+            return;
+        }
+        String[] attrNames = attrNamesString.split(Pattern.quote(delim));
+        for (String attrName : Arrays.asList(attrNames)) {
+            attrName = attrName.trim();
+            addAttrField(attrName);
+        }
+    }
+
+    public void addAttrFields(Collection<? extends String> attrNames) throws DBException {
+        if (attrNames == null) {
+            throw new DBException.NullObjectException("null attrNames to add");
+        }
+        for (String attrName : attrNames) {
+            addAttrField(attrName);
+        }
+    }
+
+    public void addAttrField(String attrName) throws DBException {
+        if (!Grammar.isValidAttributeName(attrName)) {
+            throw new TableException.InvalidAttributeNameException(attrName);
+        }
+        if (!this.attrNameSet.add(attrName.toLowerCase())) {
+            throw new TableException.InvalidAttributeNameException(attrName, "duplicate");
+        }
+        this.attrNames.add(attrName);
+        for (Entity entity : this.entities) {
+            entity.addAttribute(Grammar.Keyword.NULL.toString());
+        }
+    }
+
+    public int getNumberOfAttrFields() {
+        return this.attrNames.size();
+    }
+
+    protected void addEntity(long id, Collection<? extends String> attributes) throws DBException {
+        if (getNumberOfAttrFields() != attributes.size()) {
+            throw new TableException.InvalidNumberOfAttributesException(
+                    getNumberOfAttrFields(), attributes.size());
+        }
+        Entity entity = new Entity(id);
+        entity.addAttributes(attributes);
+        this.entities.add(entity);
+    }
+
+    public void addEntity(Collection<? extends String> attributes) throws DBException {
+        long newId = this.nextId++;
+        addEntity(newId, attributes);
+    }
+
+    public void addEntityFromString(String str) throws DBException {
+        if (str == null) {
+            throw new DBException.NullObjectException("null string for adding entity");
+        }
+        Pattern entityStrPattern = Pattern.compile("\\s*(\\d+)(\\s.*)?", Pattern.DOTALL);
+        Matcher entityStrMatcher = entityStrPattern.matcher(str);
         if (!entityStrMatcher.matches()) {
-            return false;
+            throw new TableException.InvalidEntityStringException(str);
         }
         long entityId = Long.parseLong(entityStrMatcher.group(1));
+        ArrayList<String> attrValues = new ArrayList<String>();
         String attributesString = entityStrMatcher.group(2);
-        if (attributesString == null
-                || (attributesString = attributesString.trim()).length() == 0) {
-            return addEntity(entityId, new ArrayList<String>());
+        if (attributesString != null) {
+            attrValues.addAll(Grammar.getTokensFromString(attributesString));
         }
-        return addEntity(entityId, Arrays.asList(attributesString.split("\\s+")));
+        addEntity(entityId, attrValues);
+    }
+
+    public void clear() {
+        this.entities.clear();
     }
 
     @Override
     public String toString() {
-        String str = Grammar.getIdAttrName() + "(" + nextId + ")";
-        for (String attrName : attrNames) {
-            str += " " + attrName;
+        return "" + metaFormatBracketLeft + this.nextId + ":"
+                + String.join(metaFormatDelim, this.attrNames)
+                + metaFormatBracketRight;
+    }
+
+    public String exportToString(String delim) {
+        if (delim == null) {
+            delim = " ";
         }
-        for (Entity entity : entities) {
-            str += "\n" + entity.toString();
+        String str = Grammar.getIdAttrName();
+        for (String attrName : this.attrNames) {
+            str += delim + attrName;
+        }
+        for (Entity entity : this.entities) {
+            str += "\n" + entity.exportToString(delim);
         }
         return str;
     }

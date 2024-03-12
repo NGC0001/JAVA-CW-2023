@@ -1,6 +1,8 @@
 package edu.uob;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,7 +30,8 @@ public class Grammar {
         TRUE("true"),
         FALSE("false"),
         OR("or"),
-        LIKE("like");
+        LIKE("like"),
+        NULL("null");
 
         private static HashMap<String, Keyword> strKwMap;
         static {
@@ -58,6 +61,15 @@ public class Grammar {
     }
 
     private static final String idAttrName = "id";
+
+    // TODO: implement this
+    public static List<String> getTokensFromString(String str) throws DBException {
+        if (str == null) {
+            // TODO: throw
+        }
+        // TODO: throw if not valid
+        return Arrays.asList(str.trim().split("\\s+"));
+    }
 
     public static boolean isAllLowerCase(String str) {
         return str != null && str.equals(str.toLowerCase());
@@ -97,6 +109,12 @@ public class Grammar {
     }
 
     public static boolean isValidAttributeName(String str) {
-        return str != null && isPlainText(str) && !isKeyword(str) && !idAttrName.equals(str.toLowerCase());
+        return str != null && isPlainText(str) && !isKeyword(str)
+                && !getIdAttrName().equals(str.toLowerCase());
+    }
+
+    // TODO: implement
+    public static boolean isValidAttributeValue(String str) {
+        return str != null;
     }
 }
