@@ -1,5 +1,7 @@
 package edu.uob;
 
+import java.io.Serial;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +9,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Grammar {
+    public static class GrammarException extends DBException {
+        @Serial
+        private static final long serialVersionUID = 1;
+
+        public GrammarException(String message) {
+            super(message);
+        }
+    }
+
     public static enum Keyword {
         USE("use"),
         CREATE("create"),
@@ -31,8 +42,25 @@ public class Grammar {
         FALSE("false"),
         OR("or"),
         LIKE("like"),
-        NULL("null");
+        NULL("null"),
 
+        STAR("*"),
+
+        EQ("=="),
+        NEQ("!="),
+        GT(">"),
+        GE(">="),
+        LT("<"),
+        LE("<="),
+
+        LBRACKET("("),
+        RBRACKET(")"),
+        COMMA(","),
+        SEMICOLON(";");
+
+        public static final Keyword[] symbolKeywords = {
+            STAR, EQ, NEQ, GT, GE, LT, LE, LBRACKET, RBRACKET, COMMA, SEMICOLON
+        };
         private static HashMap<String, Keyword> strKwMap;
         static {
             strKwMap = new HashMap<String, Keyword>();
@@ -62,13 +90,47 @@ public class Grammar {
 
     private static final String idAttrName = "id";
 
-    // TODO: implement this
-    public static List<String> getTokensFromString(String str) throws DBException {
+    public static Task parseCommand(String command) throws DBException {
+        ArrayList<String> tokens = getTokensFromString(command);
+        System.out.println("user command: " + tokens);
+        int numTokens = tokens.size();
+        // if (numTokens < 2 || Keyword.SEMICOLON.equals()) {
+        // }
+        return new Task();
+    }
+
+    public static ArrayList<String> getTokensFromString(String str) throws DBException {
         if (str == null) {
-            // TODO: throw
+            throw new DBException.NullObjectException("get tokens from null");
         }
-        // TODO: throw if not valid
-        return Arrays.asList(str.trim().split("\\s+"));
+        ArrayList<String> tokens = new ArrayList<String>();
+        String[] fragments = (" " + str + " ").split("'");
+        if (fragments.length % 2 != 1) {
+            throw new GrammarException("unclosed string literal");
+        }
+        for (int i = 0; i < fragments.length; ++i) {
+            if (i % 2 == 1) {
+                tokens.add("'" + fragments[i] + "'");
+            } else {
+                tokens.addAll(getTokensFromTrivialString(fragments[i]));
+            }
+        }
+        return tokens;
+    }
+
+    protected static List<String> getTokensFromTrivialString(String str) throws DBException {
+        if (str == null) {
+            throw new DBException.NullObjectException("get tokens from null");
+        }
+        for(int i = 0; i < Keyword.symbolKeywords.length; ++i) {
+            String symbolKeywordStr = Keyword.symbolKeywords[i].toString();
+            str = str.replace(symbolKeywordStr, " " + symbolKeywordStr + " ");
+        }
+        str = str.trim();
+        if (str.length() == 0) {
+            return new ArrayList<String>();
+        }
+        return Arrays.asList(str.split("\\s+"));
     }
 
     public static boolean isAllLowerCase(String str) {

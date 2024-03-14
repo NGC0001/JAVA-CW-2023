@@ -28,15 +28,15 @@ public class DBServer {
     */
     public DBServer() {
         storageFolderPath = Paths.get("databases").toAbsolutePath().toString();
-        dbKeeper = new DBKeeper();
+        this.dbKeeper = new DBKeeper();
         try {
             // Create the database storage folder if it doesn't already exist !
             Files.createDirectories(Paths.get(storageFolderPath));
-            dbKeeper.loadFromDirectory(storageFolderPath);
-        } catch(Throwable throwedObj) {
-            System.out.println("error initialising server " + throwedObj);
+            this.dbKeeper.loadFromDirectory(storageFolderPath);
+        } catch (Exception e) {
+            System.err.println("exception initialising server " + e);
         }
-        System.out.println(dbKeeper);
+        System.out.println("databases loaded: " + this.dbKeeper);
     }
 
     /**
@@ -47,7 +47,21 @@ public class DBServer {
     */
     public String handleCommand(String command) {
         // TODO implement your server logic here
-        return "";
+        try {
+            Task task = Grammar.parseCommand(command);
+            Result result = this.dbKeeper.executeTask(task);
+            return formatResponse(result);
+        } catch (Exception e) {
+            return formatResponse(e);
+        }
+    }
+
+    private String formatResponse(Result result) {
+        return "[OK]\n" + result.toString();
+    }
+
+    private String formatResponse(Exception e) {
+        return "[ERROR]\n" + e.toString();
     }
 
     //  === Methods below handle networking aspects of the project - you will not need to change these ! ===

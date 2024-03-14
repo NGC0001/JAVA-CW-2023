@@ -43,8 +43,8 @@ public class Database {
         for (String tableDescription : Arrays.asList(tableDescriptions)) {
             try {
                 loadTableByDescription(tableDescription, dataDir, tableFileNamePrefix);
-            } catch (Throwable throwedObj) {
-                System.err.println("error loading table: " + throwedObj);
+            } catch (Exception e) {
+                System.err.println("exception loading table: " + e);
             }
         }
     }
@@ -58,7 +58,7 @@ public class Database {
         String[] tableNameAndMeta = description.split(":", 2);
         if (tableNameAndMeta.length != 2) {
             throw new DBException.DatabaseStorageException(
-                    "ill-formatted meta string for table");
+                    "ill-formatted description string for table");
         }
         String tableName = tableNameAndMeta[0].trim();
         String tableMeta = tableNameAndMeta[1];

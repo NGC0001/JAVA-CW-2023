@@ -23,7 +23,8 @@ public class DBKeeper {
         this.databases = new HashMap<String, Database>();
     }
 
-    // Files.readAllBytes also throws RuntimeException/Error
+    // Files.readAllBytes also throws Error
+    // Files.readAllBytes also throws RuntimeException
     public void loadByMetaFile(Path metaFilePath) throws DBException, IOException {
         if (metaFilePath == null) {
             throw new DBException.NullObjectException(
@@ -42,7 +43,7 @@ public class DBKeeper {
         Path metaFilePath = Paths.get(directoryPath, databasesMetaFileName);
         if (!metaFilePath.toFile().isFile()) {
             throw new DBException.DatabaseStorageException(
-                    "cannot find databases meta file");
+                    "cannot find databases meta file " + metaFilePath.toString());
         }
         loadByMetaFile(metaFilePath);
     }
@@ -68,8 +69,8 @@ public class DBKeeper {
         for (String databaseDescription : Arrays.asList(databaseDescriptions)) {
             try {
                 loadDatabaseByDescription(databaseDescription, databasesDirPath);
-            } catch (Throwable throwedObj) {
-                System.err.println("error loading database: " + throwedObj);
+            } catch (Exception e) {
+                System.err.println("exception loading database: " + e);
             }
         }
     }
@@ -83,13 +84,17 @@ public class DBKeeper {
         String[] databaseNameAndMeta = description.split(":", 2);
         if (databaseNameAndMeta.length != 2) {
             throw new DBException.DatabaseStorageException(
-                    "ill-formatted meta string for database");
+                    "ill-formatted description string for database");
         }
         String dbName = databaseNameAndMeta[0].trim();
         String dbMeta = databaseNameAndMeta[1];
         Database db = new Database();
         db.loadByMetaString(dbMeta, databasesDirPath, dbName);
         addDatabase(dbName, db);
+    }
+
+    public Result executeTask(Task task) {
+        return new Result();
     }
 
     public void addDatabase(String databaseName, Database db) throws DBException {

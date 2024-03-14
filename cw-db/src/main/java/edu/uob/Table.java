@@ -166,13 +166,13 @@ public class Table {
         if (meta.length() < 2 || meta.charAt(0) != metaFormatBracketLeft
                 || meta.charAt(meta.length() - 1) != metaFormatBracketRight) {
             throw new DBException.DatabaseStorageException(
-                    "ill-formatted meta string for table");
+                    "ill-formatted meta string for table: " + meta);
         }
         meta = meta.substring(1, meta.length() - 1);
         String[] nextIdAndAttrNames = meta.split(":", 2);
         if (nextIdAndAttrNames.length != 2) {
             throw new DBException.DatabaseStorageException(
-                    "ill-formatted meta string for table");
+                    "cannot split table meta string: " + meta);
         }
         String nextIdString = nextIdAndAttrNames[0].trim();
         String attrNamesString = nextIdAndAttrNames[1];
