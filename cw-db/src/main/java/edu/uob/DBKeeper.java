@@ -93,7 +93,15 @@ public class DBKeeper {
         addDatabase(dbName, db);
     }
 
-    public Result executeTask(Task task) {
+    public Result executeTask(Task task) throws DBException {
+        if (task instanceof Task.UseTask) {
+            return executeUse((Task.UseTask)task);
+        }
+        throw new DBException("executing unknown type of task");
+    }
+
+    private Result executeUse(Task.UseTask useTask) throws DBException {
+        setCurrentDatabase(useTask.getDatabaseName());
         return new Result();
     }
 
@@ -115,6 +123,14 @@ public class DBKeeper {
             return null;
         }
         return this.databases.get(databaseName.toLowerCase());
+    }
+
+    public void setCurrentDatabase(String dbName) throws DBException {
+        Database db = getDatabase(dbName);
+        if (db == null) {
+            throw new DBException("no such database " + dbName);
+        }
+        this.currentDb = db;
     }
 
     public void clear() {

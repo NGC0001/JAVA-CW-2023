@@ -57,11 +57,11 @@ public class DBServer {
     }
 
     private String formatResponse(Result result) {
-        return "[OK]\n" + result.toString();
+        return "[OK]\n" + result.exportToString();
     }
 
     private String formatResponse(Exception e) {
-        return "[ERROR]\n" + e.toString();
+        return "[ERROR]\n" + e.getMessage();
     }
 
     //  === Methods below handle networking aspects of the project - you will not need to change these ! ===
