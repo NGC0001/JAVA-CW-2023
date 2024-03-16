@@ -27,12 +27,12 @@ public class DBServer {
     * KEEP this signature otherwise we won't be able to mark your submission correctly.
     */
     public DBServer() {
-        storageFolderPath = Paths.get("databases").toAbsolutePath().toString();
+        this.storageFolderPath = Paths.get("databases").toAbsolutePath().toString();
         this.dbKeeper = new DBKeeper();
         try {
             // Create the database storage folder if it doesn't already exist !
-            Files.createDirectories(Paths.get(storageFolderPath));
-            this.dbKeeper.loadFromDirectory(storageFolderPath);
+            Files.createDirectories(Paths.get(this.storageFolderPath));
+            this.dbKeeper.loadFromDirectory(this.storageFolderPath);
         } catch (Exception e) {
             System.err.println("exception initialising server " + e);
         }
@@ -50,6 +50,10 @@ public class DBServer {
         try {
             Task task = Grammar.parseCommand(command);
             Result result = this.dbKeeper.executeTask(task);
+            if (this.dbKeeper.getUpdated()) {
+                this.dbKeeper.storeToDirectory(this.storageFolderPath);
+                this.dbKeeper.resetUpdated();
+            }
             return formatResponse(result);
         } catch (Exception e) {
             return formatResponse(e);

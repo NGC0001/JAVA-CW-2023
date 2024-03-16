@@ -1,11 +1,15 @@
 package edu.uob;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -18,20 +22,10 @@ public class DBKeeper {
 
     private HashMap<String, Database> databases;
     private Database currentDb;
+    private boolean updated;
 
     public DBKeeper() {
         this.databases = new HashMap<String, Database>();
-    }
-
-    // Files.readAllBytes also throws Error
-    // Files.readAllBytes also throws RuntimeException
-    public void loadByMetaFile(Path metaFilePath) throws DBException, IOException {
-        if (metaFilePath == null) {
-            throw new DBException.NullObjectException(
-                    "loading database keeper from null meta file");
-        }
-        String meta = new String(Files.readAllBytes(metaFilePath));
-        loadByMetaString(meta, metaFilePath.getParent());
     }
 
     // Paths.get/Path.toFile/File.isFile also throws RuntimeException
@@ -46,6 +40,17 @@ public class DBKeeper {
                     "cannot find databases meta file " + metaFilePath.toString());
         }
         loadByMetaFile(metaFilePath);
+    }
+
+    // Files.readAllBytes also throws Error
+    // Files.readAllBytes also throws RuntimeException
+    public void loadByMetaFile(Path metaFilePath) throws DBException, IOException {
+        if (metaFilePath == null) {
+            throw new DBException.NullObjectException(
+                    "loading database keeper from null meta file");
+        }
+        String meta = new String(Files.readAllBytes(metaFilePath));
+        loadByMetaString(meta, metaFilePath.getParent());
     }
 
     public void loadByMetaString(String meta, Path databasesDirPath)
@@ -93,15 +98,65 @@ public class DBKeeper {
         addDatabase(dbName, db);
     }
 
+    public void storeToDirectory(String directoryPath) throws DBException, IOException {
+        if (directoryPath == null) {
+            throw new DBException.NullObjectException(
+                    "storing database keeper to null directory");
+        }
+        Path metaFilePath = Paths.get(directoryPath, databasesMetaFileName);
+        ArrayList<String> dbDescriptions = new ArrayList<String>();
+        for (Map.Entry<String, Database> entry : this.databases.entrySet()) {
+            String dbName = entry.getKey();
+            Database db = entry.getValue();
+            String dbMeta = db.storeToDirectory(metaFilePath.getParent(), dbName);
+            dbDescriptions.add(dbName + ": " + dbMeta);
+        }
+        String meta = String.join(metaFormatDelim + "\n", dbDescriptions);
+        if (meta.length() > 0) {
+            meta = "\n" + meta;
+        }
+        meta = meta.replace("\n", "\n  ") + "\n";
+        meta = metaFormatBracketLeft + meta + metaFormatBracketRight;
+        Files.write(metaFilePath, meta.getBytes(), StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
     public Result executeTask(Task task) throws DBException {
         if (task instanceof Task.UseTask) {
-            return executeUse((Task.UseTask)task);
+            return executeUse((Task.UseTask) task);
+        }
+        if (task instanceof Task.CreateDatabaseTask) {
+            return executeCreateDatabase((Task.CreateDatabaseTask) task);
+        }
+        if (task instanceof Task.CreateTableTask) {
+            return executeCreateTable((Task.CreateTableTask) task);
         }
         throw new DBException("executing unknown type of task");
     }
 
-    private Result executeUse(Task.UseTask useTask) throws DBException {
-        setCurrentDatabase(useTask.getDatabaseName());
+    private Result executeUse(Task.UseTask task) throws DBException {
+        setCurrentDatabase(task.getDatabaseName());
+        return new Result();
+    }
+
+    private Result executeCreateDatabase(Task.CreateDatabaseTask task) throws DBException {
+        String dbName = task.getDatabaseName();
+        Database db = new Database();
+        addDatabase(dbName, db);
+        setUpdated();
+        return new Result();
+    }
+
+    private Result executeCreateTable(Task.CreateTableTask task) throws DBException {
+        if (this.currentDb == null) {
+            throw new DBException("current database not set yet");
+        }
+        String tableName = task.getTableName();
+        Table table = new Table();
+        table.addAttrFields(task.getAttrNames());
+        this.currentDb.addTable(tableName, table);
+        setUpdated();
         return new Result();
     }
 
@@ -119,10 +174,22 @@ public class DBKeeper {
     }
 
     public Database getDatabase(String databaseName) {
-        if (databaseName == null || databaseName == null) {
+        if (databaseName == null) {
             return null;
         }
         return this.databases.get(databaseName.toLowerCase());
+    }
+
+    public boolean getUpdated() {
+        return this.updated;
+    }
+
+    public void setUpdated() {
+        this.updated = true;
+    }
+
+    public void resetUpdated() {
+        this.updated = false;
     }
 
     public void setCurrentDatabase(String dbName) throws DBException {

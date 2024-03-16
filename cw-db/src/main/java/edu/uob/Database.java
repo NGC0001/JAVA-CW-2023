@@ -4,8 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -69,10 +71,35 @@ public class Database {
         addTable(tableName, table);
     }
 
+    public String storeToDirectory(Path dataDir, String tableFileNamePrefix)
+            throws DBException, IOException {
+        if (dataDir == null || tableFileNamePrefix == null) {
+            throw new DBException.NullObjectException(
+                    "null arguments while storing database to directory");
+        }
+        ArrayList<String> tableDescriptions = new ArrayList<String>();
+        for (Map.Entry<String, Table> entry : this.tables.entrySet()) {
+            String tableName = entry.getKey();
+            Table table = entry.getValue();
+            String tableFileName = getFilePathForTable(tableFileNamePrefix, tableName, table);
+            Path tableFilePath = Paths.get(dataDir.toString(), tableFileName);
+            String tableMeta = table.storeToFile(tableFilePath);
+            tableDescriptions.add(tableName + ": " + tableMeta);
+        }
+        String meta = String.join(metaFormatDelim + "\n", tableDescriptions);
+        if (meta.length() > 0) {
+            meta = "\n" + meta;
+        }
+        meta = meta.replace("\n", "\n  ") + "\n";
+        meta = metaFormatBracketLeft + meta + metaFormatBracketRight;
+        return meta;
+    }
+
     public String getFilePathForTable(String fileNamePrefix, String tableName, Table table)
             throws DBException {
         if (tableName == null || table == null) {
-            throw new DBException.NullObjectException("getting table name from null objects");
+            throw new DBException.NullObjectException(
+                    "getting table name from null objects");
         }
         String tableFileName = tableName + "." + table.getNextId() + "." + tableFileNameSuffix;
         if (fileNamePrefix != null) {

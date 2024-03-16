@@ -101,25 +101,72 @@ public class Grammar {
         }
     }
 
+    // Does not throw DBException.
+    // Only a thin layer around List<String> to avoid dynamic modification.
+    private static class TokenList {
+        private List<String> tokens;
+        private int startIdx;
+        private int endIdx;
+
+        public TokenList(List<String> tokens) {
+            this.tokens = tokens;
+            this.startIdx = 0;
+            this.endIdx = tokens.size();
+        }
+
+        public int size() {
+            return this.endIdx - this.startIdx;
+        }
+
+        public boolean empty() {
+            return size() <= 0;
+        }
+
+        public String front() {
+            return this.tokens.get(this.startIdx);
+        }
+
+        public String popFront() {
+            String token = this.tokens.get(this.startIdx);
+            this.startIdx += 1;
+            return token;
+        }
+
+        public String popBack() {
+            this.endIdx -= 1;
+            return this.tokens.get(this.endIdx);
+        }
+
+        @Override
+        public String toString() {
+            return this.tokens.subList(this.startIdx, this.endIdx).toString();
+        }
+    }
+
     private static final String idAttrName = "id";
 
     public static Task parseCommand(String command) throws DBException {
-        List<String> tokens = getTokensFromString(command);
+        TokenList tokens = new TokenList(getTokensFromString(command));
         System.out.println("command tokens: " + tokens);
-        int numTokens = tokens.size();
-        if (tokens.size() < 2
-                || !Keyword.SEMICOLON.equals(tokens.get(numTokens - 1))) {
-            throw new GrammarException("command incomplete or empty");
+        ensureMoreTokens(tokens, "empty command");
+        if (!isKeyword(Keyword.SEMICOLON, tokens.popBack())) {
+            throw new GrammarException("command not closed by semicolon");
         }
-        String cmdTypeStr = tokens.get(0);
-        tokens = tokens.subList(1, numTokens - 1);
+        ensureMoreTokens(tokens);
+        String cmdTypeStr = tokens.popFront();
         Keyword cmdType = Keyword.getByString(cmdTypeStr);
         if (cmdType == null) {
             throw new GrammarException.UnknownCommandTypeException(cmdTypeStr);
         }
+        return parseCommandType(cmdType, tokens);
+    }
+
+    private static Task parseCommandType(Keyword cmdType, TokenList tokens) throws DBException {
         switch (cmdType) {
-            case USE: return parseUse(tokens);
+            case USE:
+                return parseUse(tokens);
             case CREATE:
+                return parseCreate(tokens);
             case DROP:
             case ALTER:
             case INSERT:
@@ -128,18 +175,69 @@ public class Grammar {
             case DELETE:
             case JOIN:
         }
-        throw new GrammarException.UnknownCommandTypeException(cmdTypeStr);
+        throw new GrammarException.UnknownCommandTypeException(cmdType.toString());
     }
 
-    private static Task parseUse(List<String> tokens) throws DBException {
+    private static Task parseUse(TokenList tokens) throws GrammarException {
         if (tokens.size() != 1) {
             throw new GrammarException("use command expect exactly one database name");
         }
-        String databaseName = tokens.get(0);
-        if (!isValidDatabaseName(databaseName)) {
-            throw new GrammarException("invalid database name " + databaseName);
+        String databaseName = tokens.popFront();
+        ensureValidDatabaseName(databaseName);
+        return new Task.UseTask(databaseName);
+    }
+
+    private static Task parseCreate(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "incomplete create command");
+        String createTypeStr = tokens.popFront();
+        Keyword createType = Keyword.getByString(createTypeStr);
+        if (createType == Keyword.DATABASE) {
+            return parseCreateDatabase(tokens);
         }
-        return new Task.UseTask(tokens.get(0));
+        if (createType == Keyword.TABLE) {
+            return parseCreateTable(tokens);
+        }
+        throw new GrammarException("can not create " + createTypeStr);
+    }
+
+    private static Task parseCreateDatabase(TokenList tokens) throws GrammarException {
+        if (tokens.size() != 1) {
+            throw new GrammarException("expect exactly one database name to create");
+        }
+        String databaseName = tokens.popFront();
+        ensureValidDatabaseName(databaseName);
+        return new Task.CreateDatabaseTask(databaseName);
+    }
+
+    private static Task parseCreateTable(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "expect a table name to create");
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        Task.CreateTableTask task = new Task.CreateTableTask(tableName);
+        if (tokens.empty()) {
+            return task;
+        }
+        ensureIsKeyword(Keyword.LBRACKET, tokens.popFront());
+        parseAttributeList(tokens, task);
+        ensureMoreTokens(tokens, "expect a bracket to close attribute list");
+        ensureIsKeyword(Keyword.RBRACKET, tokens.popFront());
+        ensureNoMoreTokens(tokens);
+        return task;
+    }
+
+    private static void parseAttributeList(TokenList tokens, Task.CreateTableTask task)
+            throws GrammarException {
+        ensureMoreTokens(tokens, "expect at least one attribute name");
+        String attrName = tokens.popFront();
+        ensureValidAttributeName(attrName);
+        task.addAttrName(attrName);
+        while (!tokens.empty() && isKeyword(Keyword.COMMA, tokens.front())) {
+            tokens.popFront();
+            ensureMoreTokens(tokens, "expect an attribute name after comma");
+            attrName = tokens.popFront();
+            ensureValidAttributeName(attrName);
+            task.addAttrName(attrName);
+        }
     }
 
     public static ArrayList<String> getTokensFromString(String str) throws DBException {
@@ -166,11 +264,11 @@ public class Grammar {
             throw new DBException.NullObjectException("get tokens from null");
         }
         final Keyword[] symbolKeywords = { // No GE and LE here
-            // The order here: EQ -> NEQ -> GT/LT
-            Keyword.STAR, Keyword.EQ, Keyword.NEQ, Keyword.GT, Keyword.LT,
-            Keyword.LBRACKET, Keyword.RBRACKET, Keyword.COMMA, Keyword.SEMICOLON
+                // The order here: EQ -> NEQ -> GT/LT
+                Keyword.STAR, Keyword.EQ, Keyword.NEQ, Keyword.GT, Keyword.LT,
+                Keyword.LBRACKET, Keyword.RBRACKET, Keyword.COMMA, Keyword.SEMICOLON
         };
-        for(int i = 0; i < symbolKeywords.length; ++i) {
+        for (int i = 0; i < symbolKeywords.length; ++i) {
             String keywordStr = symbolKeywords[i].toString();
             str = str.replace(keywordStr, " " + keywordStr + " ");
         }
@@ -189,6 +287,10 @@ public class Grammar {
 
     public static boolean isKeyword(String str) {
         return Keyword.getByString(str) != null;
+    }
+
+    public static boolean isKeyword(Keyword kw, String str) {
+        return kw != null && kw.equals(str);
     }
 
     public static boolean isValue(String str) {
@@ -224,5 +326,55 @@ public class Grammar {
     // TODO: implement
     public static boolean isValidAttributeValue(String str) {
         return str != null;
+    }
+
+    private static void ensureValidDatabaseName(String databaseName) throws GrammarException {
+        if (!isValidDatabaseName(databaseName)) {
+            throw new GrammarException("invalid database name " + databaseName);
+        }
+    }
+
+    private static void ensureValidTableName(String tableName) throws GrammarException {
+        if (!isValidTableName(tableName)) {
+            throw new GrammarException("invalid table name " + tableName);
+        }
+    }
+
+    private static void ensureValidAttributeName(String attrName) throws GrammarException {
+        if (!isValidAttributeName(attrName)) {
+            throw new GrammarException("invalid attribute name " + attrName);
+        }
+    }
+
+    private static void ensureIsKeyword(Keyword kw, String str) throws GrammarException {
+        if (!isKeyword(kw, str)) {
+            throw new GrammarException("expect " + kw + " but found " + str);
+        }
+    }
+
+    private static void ensureMoreTokens(TokenList tokens, String err) throws GrammarException {
+        if (err == null) {
+            err = "expect more tokens, command incomplete";
+        }
+        if (tokens.empty()) {
+            throw new GrammarException(err);
+        }
+    }
+
+    private static void ensureMoreTokens(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, null);
+    }
+
+    private static void ensureNoMoreTokens(TokenList tokens, String err) throws GrammarException {
+        if (err == null) {
+            err = "extra tokens in command";
+        }
+        if (!tokens.empty()) {
+            throw new GrammarException(err);
+        }
+    }
+
+    private static void ensureNoMoreTokens(TokenList tokens) throws GrammarException {
+        ensureNoMoreTokens(tokens, null);
     }
 }

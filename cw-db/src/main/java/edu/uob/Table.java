@@ -5,6 +5,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serial;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,15 +44,6 @@ public class Table {
 
             public NegativeNextIdException(long nextId) {
                 super("negative nextId " + nextId);
-            }
-        }
-
-        public static class InvalidTableStringException extends TableException {
-            @Serial
-            private static final long serialVersionUID = 1;
-
-            public InvalidTableStringException(String str) {
-                super("string does not represent a table: " + str);
             }
         }
 
@@ -205,6 +199,16 @@ public class Table {
                 addEntityFromString(line);
             }
         }
+    }
+
+    public String storeToFile(Path tableFilePath) throws DBException, IOException {
+        Files.write(tableFilePath, exportToString("\t").getBytes(), StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+        String meta = metaFormatBracketLeft
+                + "" + this.nextId + ":" + String.join(metaFormatDelim, this.attrNames)
+                + metaFormatBracketRight;
+        return meta;
     }
 
     public boolean validateTableHeader(Collection<? extends String> headerFields) {
