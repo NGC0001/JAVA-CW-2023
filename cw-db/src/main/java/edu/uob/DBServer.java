@@ -50,9 +50,9 @@ public class DBServer {
         try {
             Task task = Grammar.parseCommand(command);
             Result result = this.dbKeeper.executeTask(task);
-            if (this.dbKeeper.getUpdated()) {
+            if (this.dbKeeper.getUpdatedByTask()) {
                 this.dbKeeper.storeToDirectory(this.storageFolderPath);
-                this.dbKeeper.resetUpdated();
+                this.dbKeeper.resetUpdatedByTask();
             }
             return formatResponse(result);
         } catch (Exception e) {

@@ -122,6 +122,27 @@ public class Database {
         }
     }
 
+    public void dropTable(String tableName) throws DBException {
+        if (tableName == null) {
+            throw new DBException.NullObjectException("null table name for dropping");
+        }
+        Table removedTable = this.tables.remove(tableName.toLowerCase());
+        if (removedTable == null) {
+            throw new DBException.InvalidTableNameException(tableName, "not exists");
+        }
+    }
+
+    public Table getTable(String tableName) throws DBException {
+        if (tableName == null) {
+            throw new DBException.NullObjectException("null table name");
+        }
+        Table table = this.tables.get(tableName.toLowerCase());
+        if (table == null) {
+            throw new DBException.InvalidTableNameException(tableName, "not exists");
+        }
+        return table;
+    }
+
     public void clear() {
         tables.clear();
     }

@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 // This class represents a collection of databases.
+// It is also an executor of user commands.
 public class DBKeeper {
     private static final String databasesMetaFileName = "databases.meta";
     private static final char metaFormatBracketLeft = '{';
@@ -22,10 +23,12 @@ public class DBKeeper {
 
     private HashMap<String, Database> databases;
     private Database currentDb;
-    private boolean updated;
+    private boolean updatedByTask;
 
     public DBKeeper() {
         this.databases = new HashMap<String, Database>();
+        this.currentDb = null;
+        this.updatedByTask = false;
     }
 
     // Paths.get/Path.toFile/File.isFile also throws RuntimeException
@@ -125,14 +128,19 @@ public class DBKeeper {
     public Result executeTask(Task task) throws DBException {
         if (task instanceof Task.UseTask) {
             return executeUse((Task.UseTask) task);
-        }
-        if (task instanceof Task.CreateDatabaseTask) {
+        } else if (task instanceof Task.CreateDatabaseTask) {
             return executeCreateDatabase((Task.CreateDatabaseTask) task);
-        }
-        if (task instanceof Task.CreateTableTask) {
+        } else if (task instanceof Task.CreateTableTask) {
             return executeCreateTable((Task.CreateTableTask) task);
+        } else if (task instanceof Task.DropDatabaseTask) {
+            return executeDropDatabase((Task.DropDatabaseTask) task);
+        } else if (task instanceof Task.DropTableTask) {
+            return executeDropTable((Task.DropTableTask) task);
+        } else if (task instanceof Task.AlterTask) {
+            return executeAlter((Task.AlterTask) task);
+        } else {
+            throw new DBException("executing unknown type of task");
         }
-        throw new DBException("executing unknown type of task");
     }
 
     private Result executeUse(Task.UseTask task) throws DBException {
@@ -144,19 +152,39 @@ public class DBKeeper {
         String dbName = task.getDatabaseName();
         Database db = new Database();
         addDatabase(dbName, db);
-        setUpdated();
+        setUpdatedByTask();
         return new Result();
     }
 
     private Result executeCreateTable(Task.CreateTableTask task) throws DBException {
-        if (this.currentDb == null) {
-            throw new DBException("current database not set yet");
-        }
         String tableName = task.getTableName();
         Table table = new Table();
         table.addAttrFields(task.getAttrNames());
-        this.currentDb.addTable(tableName, table);
-        setUpdated();
+        getCurrentDatabase().addTable(tableName, table);
+        setUpdatedByTask();
+        return new Result();
+    }
+
+    private Result executeDropDatabase(Task.DropDatabaseTask task) throws DBException {
+        dropDatabase(task.getDatabaseName());
+        setUpdatedByTask();
+        return new Result();
+    }
+
+    private Result executeDropTable(Task.DropTableTask task) throws DBException {
+        getCurrentDatabase().dropTable(task.getTableName());
+        setUpdatedByTask();
+        return new Result();
+    }
+
+    private Result executeAlter(Task.AlterTask task) throws DBException {
+        Table table = getCurrentDatabase().getTable(task.getTableName());
+        if (task.isAdding()) {
+            table.addAttrField(task.getAttrName());
+        } else {
+            table.dropAttrField(task.getAttrName());
+        }
+        setUpdatedByTask();
         return new Result();
     }
 
@@ -167,37 +195,57 @@ public class DBKeeper {
         if (!Grammar.isValidDatabaseName(databaseName)) {
             throw new DBException.InvalidDatabaseNameException(databaseName);
         }
-        Database oldDataBase = this.databases.putIfAbsent(databaseName.toLowerCase(), db);
-        if (oldDataBase != null) {
+        Database oldDatabase = this.databases.putIfAbsent(databaseName.toLowerCase(), db);
+        if (oldDatabase != null) {
             throw new DBException.InvalidDatabaseNameException(databaseName, "duplicate");
         }
     }
 
-    public Database getDatabase(String databaseName) {
+    public void dropDatabase(String databaseName) throws DBException {
         if (databaseName == null) {
-            return null;
+            throw new DBException.NullObjectException("null database name for dropping");
         }
-        return this.databases.get(databaseName.toLowerCase());
+        Database removedDatabase = this.databases.remove(databaseName.toLowerCase());
+        if (removedDatabase == null) {
+            throw new DBException.InvalidDatabaseNameException(databaseName, "not exists");
+        }
+        if (removedDatabase == this.currentDb) {
+            this.currentDb = null;
+        }
     }
 
-    public boolean getUpdated() {
-        return this.updated;
+    public Database getDatabase(String databaseName) throws DBException {
+        if (databaseName == null) {
+            throw new DBException.NullObjectException("null database name");
+        }
+        Database db = this.databases.get(databaseName.toLowerCase());
+        if (db == null) {
+            throw new DBException.InvalidDatabaseNameException(databaseName, "not exists");
+        }
+        return db;
     }
 
-    public void setUpdated() {
-        this.updated = true;
+    public boolean getUpdatedByTask() {
+        return this.updatedByTask;
     }
 
-    public void resetUpdated() {
-        this.updated = false;
+    private void setUpdatedByTask() {
+        this.updatedByTask = true;
+    }
+
+    public void resetUpdatedByTask() {
+        this.updatedByTask = false;
+    }
+
+    private Database getCurrentDatabase() throws DBException {
+        if (this.currentDb == null) {
+            throw new DBException("current database not set yet");
+        }
+        return this.currentDb;
     }
 
     public void setCurrentDatabase(String dbName) throws DBException {
-        Database db = getDatabase(dbName);
-        if (db == null) {
-            throw new DBException("no such database " + dbName);
-        }
-        this.currentDb = db;
+        this.currentDb = getDatabase(dbName);
     }
 
     public void clear() {

@@ -98,7 +98,7 @@ public class Table {
 
         protected void addAttribute(String attr) throws DBException {
             if (!Grammar.isValidAttributeValue(attr)) {
-                throw new TableException.InvalidAttributeNameException(attr);
+                throw new TableException.InvalidAttributeValueException(attr);
             }
             this.attributes.add(attr);
         }
@@ -110,6 +110,11 @@ public class Table {
             for (String attr : attributes) {
                 addAttribute(attr);
             }
+        }
+
+        // Caller shall ensure `idx` not out of bounds
+        protected void dropAttribute(int idx) {
+            this.attributes.remove(idx);
         }
 
         @Override
@@ -268,6 +273,30 @@ public class Table {
         this.attrNames.add(attrName);
         for (Entity entity : this.entities) {
             entity.addAttribute(Grammar.Keyword.NULL.toString());
+        }
+    }
+
+    public int getAttrFieldIdx(String attrName) throws DBException {
+        if (attrName == null) {
+            throw new DBException.NullObjectException("null attribute name");
+        }
+        String attrNameLower = attrName.toLowerCase();
+        if (!this.attrNameSet.contains(attrNameLower)) {
+            throw new TableException.InvalidAttributeNameException(attrName, "not exists");
+        }
+        int idx = 0;
+        while (this.attrNames.get(idx).toLowerCase() != attrNameLower) {
+            ++idx;
+        }
+        return idx;
+    }
+
+    public void dropAttrField(String attrName) throws DBException {
+        int idx = getAttrFieldIdx(attrName);
+        this.attrNameSet.remove(attrName.toLowerCase());
+        this.attrNames.remove(idx);
+        for (Entity entity : this.entities) {
+            entity.dropAttribute(idx);
         }
     }
 

@@ -167,8 +167,8 @@ public class Grammar {
                 return parseUse(tokens);
             case CREATE:
                 return parseCreate(tokens);
-            case DROP:
-            case ALTER:
+            case DROP: return parseDrop(tokens);
+            case ALTER: return parseAlter(tokens);
             case INSERT:
             case SELECT:
             case UPDATE:
@@ -223,6 +223,55 @@ public class Grammar {
         ensureIsKeyword(Keyword.RBRACKET, tokens.popFront());
         ensureNoMoreTokens(tokens);
         return task;
+    }
+
+    private static Task parseDrop(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "incomplete drop command");
+        String dropTypeStr = tokens.popFront();
+        Keyword dropType = Keyword.getByString(dropTypeStr);
+        if (dropType == Keyword.DATABASE) {
+            return parseDropDatabase(tokens);
+        }
+        if (dropType == Keyword.TABLE) {
+            return parseDropTable(tokens);
+        }
+        throw new GrammarException("can not drop " + dropTypeStr);
+    }
+
+    private static Task parseDropDatabase(TokenList tokens) throws GrammarException {
+        if (tokens.size() != 1) {
+            throw new GrammarException("expect exactly one database name to drop");
+        }
+        String databaseName = tokens.popFront();
+        ensureValidDatabaseName(databaseName);
+        return new Task.DropDatabaseTask(databaseName);
+    }
+
+    private static Task parseDropTable(TokenList tokens) throws GrammarException {
+        if (tokens.size() != 1) {
+            throw new GrammarException("expect exactly one table name to drop");
+        }
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        return new Task.DropTableTask(tableName);
+    }
+
+    private static Task parseAlter(TokenList tokens) throws GrammarException {
+        if (tokens.size() != 4) {
+            throw new GrammarException(
+                    "expect alter command: ALTER TABLE [TableName] ADD/DROP [AttrName]");
+        }
+        ensureIsKeyword(Keyword.TABLE, tokens.popFront());
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        String alterTypeStr = tokens.popFront();
+        Keyword alterType = Keyword.getByString(alterTypeStr);
+        if (alterType != Keyword.ADD || alterType != Keyword.DROP) {
+            throw new GrammarException("unknown alter type " + alterTypeStr);
+        }
+        String attrName = tokens.popFront();
+        ensureValidAttributeName(attrName);
+        return new Task.AlterTask(tableName, attrName, alterType == Keyword.ADD);
     }
 
     private static void parseAttributeList(TokenList tokens, Task.CreateTableTask task)
@@ -344,6 +393,11 @@ public class Grammar {
         if (!isValidAttributeName(attrName)) {
             throw new GrammarException("invalid attribute name " + attrName);
         }
+    }
+
+    private static void ensurePopKeyword(Keyword kw, TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "missing keyword " + kw);
+        ensureIsKeyword(kw, tokens.popFront());
     }
 
     private static void ensureIsKeyword(Keyword kw, String str) throws GrammarException {

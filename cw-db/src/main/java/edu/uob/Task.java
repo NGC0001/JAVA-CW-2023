@@ -57,4 +57,55 @@ public abstract class Task {
             this.attrNames.add(attrName);
         }
     }
+
+    public static class DropDatabaseTask extends Task {
+        private String databaseName;
+
+        public DropDatabaseTask(String databaseName) {
+            super();
+            this.databaseName = databaseName;
+        }
+
+        public String getDatabaseName() {
+            return this.databaseName;
+        }
+    }
+
+    public static class DropTableTask extends Task {
+        private String tableName;
+
+        public DropTableTask(String tableName) {
+            super();
+            this.tableName = tableName;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+    }
+
+    public static class AlterTask extends Task {
+        private String tableName;
+        private String attrName;
+        private boolean adding;
+
+        public AlterTask(String tableName, String attrName, boolean adding) {
+            super();
+            this.tableName = tableName;
+            this.attrName = attrName;
+            this.adding = adding;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+
+        public String getAttrName() {
+            return this.attrName;
+        }
+
+        public boolean isAdding() {
+            return this.adding;
+        }
+    }
 }
