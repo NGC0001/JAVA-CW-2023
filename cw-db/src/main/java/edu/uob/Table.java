@@ -126,7 +126,7 @@ public class Table {
             if (delim == null) {
                 delim = " ";
             }
-            String str = "" + this.id;
+            String str = String.valueOf(this.id);
             for (String attr : this.attributes) {
                 str += delim + attr;
             }
@@ -210,8 +210,8 @@ public class Table {
         Files.write(tableFilePath, exportToString("\t").getBytes(), StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
-        String meta = metaFormatBracketLeft
-                + "" + this.nextId + ":" + String.join(metaFormatDelim, this.attrNames)
+        String meta = String.valueOf(metaFormatBracketLeft)
+                + this.nextId + ":" + String.join(metaFormatDelim, this.attrNames)
                 + metaFormatBracketRight;
         return meta;
     }
@@ -315,8 +315,9 @@ public class Table {
     }
 
     public void addEntity(Collection<? extends String> attributes) throws DBException {
-        long newId = this.nextId++;
+        long newId = this.nextId;
         addEntity(newId, attributes);
+        this.nextId++;
     }
 
     public void addEntityFromString(String str) throws DBException {
@@ -343,7 +344,7 @@ public class Table {
 
     @Override
     public String toString() {
-        return "" + metaFormatBracketLeft + this.nextId + ":"
+        return String.valueOf(metaFormatBracketLeft) + this.nextId + ":"
                 + String.join(metaFormatDelim, this.attrNames)
                 + metaFormatBracketRight;
     }

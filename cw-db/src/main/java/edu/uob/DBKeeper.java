@@ -119,7 +119,7 @@ public class DBKeeper {
             meta = "\n" + meta;
         }
         meta = meta.replace("\n", "\n  ") + "\n";
-        meta = metaFormatBracketLeft + meta + metaFormatBracketRight;
+        meta = String.valueOf(metaFormatBracketLeft) + meta + metaFormatBracketRight;
         Files.write(metaFilePath, meta.getBytes(), StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
@@ -138,6 +138,8 @@ public class DBKeeper {
             return executeDropTable((Task.DropTableTask) task);
         } else if (task instanceof Task.AlterTask) {
             return executeAlter((Task.AlterTask) task);
+        } else if (task instanceof Task.InsertTask) {
+            return executeInsert((Task.InsertTask) task);
         } else {
             throw new DBException("executing unknown type of task");
         }
@@ -184,6 +186,13 @@ public class DBKeeper {
         } else {
             table.dropAttrField(task.getAttrName());
         }
+        setUpdatedByTask();
+        return new Result();
+    }
+
+    private Result executeInsert(Task.InsertTask task) throws DBException {
+        Table table = getCurrentDatabase().getTable(task.getTableName());
+        table.addEntity(task.getValues());
         setUpdatedByTask();
         return new Result();
     }
@@ -255,7 +264,7 @@ public class DBKeeper {
 
     @Override
     public String toString() {
-        return "" + metaFormatBracketLeft
+        return String.valueOf(metaFormatBracketLeft)
                 + String.join(metaFormatDelim, this.databases.entrySet().stream()
                         .map((entry) -> entry.getKey() + ":" + entry.getValue())
                         .collect(Collectors.toList()))

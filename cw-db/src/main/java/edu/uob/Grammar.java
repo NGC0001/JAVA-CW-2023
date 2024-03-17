@@ -143,7 +143,13 @@ public class Grammar {
         }
     }
 
+    @FunctionalInterface
+    private static interface ElementExtractor<E> {
+        E extract(TokenList tokens) throws GrammarException;
+    }
+
     private static final String idAttrName = "id";
+    private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
 
     public static Task parseCommand(String command) throws DBException {
         TokenList tokens = new TokenList(getTokensFromString(command));
@@ -169,7 +175,7 @@ public class Grammar {
                 return parseCreate(tokens);
             case DROP: return parseDrop(tokens);
             case ALTER: return parseAlter(tokens);
-            case INSERT:
+            case INSERT: return parseInsert(tokens);
             case SELECT:
             case UPDATE:
             case DELETE:
@@ -218,7 +224,13 @@ public class Grammar {
             return task;
         }
         ensureIsKeyword(Keyword.LBRACKET, tokens.popFront());
-        parseAttributeList(tokens, task);
+        List<String> attrNames = parseList(tokens, (tokenList) -> {
+            ensureMoreTokens(tokens, "empty or incomplete attribute name list");
+            String attrName = tokenList.popFront();
+            ensureValidAttributeName(attrName);
+            return attrName;
+        });
+        task.addAttrNames(attrNames);
         ensureMoreTokens(tokens, "expect a bracket to close attribute list");
         ensureIsKeyword(Keyword.RBRACKET, tokens.popFront());
         ensureNoMoreTokens(tokens);
@@ -274,19 +286,34 @@ public class Grammar {
         return new Task.AlterTask(tableName, attrName, alterType == Keyword.ADD);
     }
 
-    private static void parseAttributeList(TokenList tokens, Task.CreateTableTask task)
-            throws GrammarException {
-        ensureMoreTokens(tokens, "expect at least one attribute name");
-        String attrName = tokens.popFront();
-        ensureValidAttributeName(attrName);
-        task.addAttrName(attrName);
+    private static Task parseInsert(TokenList tokens) throws GrammarException {
+        ensurePopKeyword(Keyword.INTO, tokens);
+        ensureMoreTokens(tokens, "expect table name for insertion");
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        ensurePopKeyword(Keyword.VALUES, tokens);
+        ensurePopKeyword(Keyword.LBRACKET, tokens);
+        List<String> values = parseList(tokens, (tokenList) -> {
+            ensureMoreTokens(tokens, "empty or incomplete attribute value list");
+            String value = tokenList.popFront();
+            ensureValidAttributeValue(value);
+            return value;
+        });
+        ensurePopKeyword(Keyword.RBRACKET, tokens);
+        ensureNoMoreTokens(tokens);
+        return new Task.InsertTask(tableName, values);
+    }
+
+    private static <E> List<E> parseList(TokenList tokens, ElementExtractor<E> extractor) throws GrammarException {
+        ArrayList<E> list = new ArrayList<E>();
+        E e = extractor.extract(tokens);
+        list.add(e);
         while (!tokens.empty() && isKeyword(Keyword.COMMA, tokens.front())) {
             tokens.popFront();
-            ensureMoreTokens(tokens, "expect an attribute name after comma");
-            attrName = tokens.popFront();
-            ensureValidAttributeName(attrName);
-            task.addAttrName(attrName);
+            e = extractor.extract(tokens);
+            list.add(e);
         }
+        return list;
     }
 
     public static ArrayList<String> getTokensFromString(String str) throws DBException {
@@ -342,13 +369,59 @@ public class Grammar {
         return kw != null && kw.equals(str);
     }
 
-    public static boolean isValue(String str) {
-        return false;
-    } // TODO
+    public static boolean isSymbol(char ch) {
+        return allSymbols.indexOf(ch) >= 0;
+    }
 
-    public static boolean isSymbol(String str) {
+    public static boolean isCharLiteral(char ch) {
+      if (ch > 256) {
         return false;
-    } // TODO
+      }
+      return ch == ' ' || Character.isLetterOrDigit(ch) || isSymbol(ch);
+    }
+
+    // String literal includes "'"
+    public static boolean isStringLiteral(String str) {
+        if (str == null) {
+            return false;
+        }
+        int strLen = str.length();
+        if (strLen < 2 || str.charAt(0) != '\'' || str.charAt(strLen - 1) != '\'') {
+          return false;
+        }
+        for (int i = 1; i < strLen - 1; ++i) {
+          if (!isCharLiteral(str.charAt(i))) {
+            return false;
+          }
+        }
+        return true;
+    }
+
+    public static boolean isBooleanLiteral(String str) {
+        return isKeyword(Keyword.TRUE, str) || isKeyword(Keyword.FALSE, str);
+    }
+
+    public static boolean isFloatLiteral(String str) {
+        if (str == null) {
+            return false;
+        }
+        Pattern floatPattern = Pattern.compile("[+-]?[0-9]+\\.[0-9]+");
+        Matcher floatMatcher = floatPattern.matcher(str);
+        return floatMatcher.matches();
+    }
+
+    public static boolean isIntegerLiteral(String str) {
+        if (str == null) {
+            return false;
+        }
+        Pattern integerPattern = Pattern.compile("[+-]?[0-9]+");
+        Matcher integerMatcher = integerPattern.matcher(str);
+        return integerMatcher.matches();
+    }
+
+    public static boolean isNullLiteral(String str) {
+        return isKeyword(Keyword.NULL, str);
+    }
 
     public static boolean isPlainText(String str) {
         if (str == null) {
@@ -372,9 +445,9 @@ public class Grammar {
                 && !getIdAttrName().equals(str.toLowerCase());
     }
 
-    // TODO: implement
     public static boolean isValidAttributeValue(String str) {
-        return str != null;
+        return isStringLiteral(str) || isBooleanLiteral(str)
+          || isFloatLiteral(str) || isIntegerLiteral(str) || isNullLiteral(str);
     }
 
     private static void ensureValidDatabaseName(String databaseName) throws GrammarException {
@@ -395,9 +468,10 @@ public class Grammar {
         }
     }
 
-    private static void ensurePopKeyword(Keyword kw, TokenList tokens) throws GrammarException {
-        ensureMoreTokens(tokens, "missing keyword " + kw);
-        ensureIsKeyword(kw, tokens.popFront());
+    public static void ensureValidAttributeValue(String attrValue) throws GrammarException {
+        if (!isValidAttributeValue(attrValue)) {
+            throw new GrammarException("invalid attribute value " + attrValue);
+        }
     }
 
     private static void ensureIsKeyword(Keyword kw, String str) throws GrammarException {
@@ -430,5 +504,10 @@ public class Grammar {
 
     private static void ensureNoMoreTokens(TokenList tokens) throws GrammarException {
         ensureNoMoreTokens(tokens, null);
+    }
+
+    private static void ensurePopKeyword(Keyword kw, TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "missing keyword " + kw);
+        ensureIsKeyword(kw, tokens.popFront());
     }
 }

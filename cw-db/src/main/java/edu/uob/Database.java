@@ -91,7 +91,7 @@ public class Database {
             meta = "\n" + meta;
         }
         meta = meta.replace("\n", "\n  ") + "\n";
-        meta = metaFormatBracketLeft + meta + metaFormatBracketRight;
+        meta = String.valueOf(metaFormatBracketLeft) + meta + metaFormatBracketRight;
         return meta;
     }
 
@@ -149,7 +149,7 @@ public class Database {
 
     @Override
     public String toString() {
-        return "" + metaFormatBracketLeft
+        return String.valueOf(metaFormatBracketLeft)
                 + String.join(metaFormatDelim, this.tables.entrySet().stream()
                         .map((entry) -> entry.getKey() + ":" + entry.getValue())
                         .collect(Collectors.toList()))

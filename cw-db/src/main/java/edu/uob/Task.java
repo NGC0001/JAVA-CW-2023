@@ -1,6 +1,7 @@
 package edu.uob;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 // This class represent an operation on databases.
@@ -37,7 +38,7 @@ public abstract class Task {
 
     public static class CreateTableTask extends Task {
         private String tableName;
-        private ArrayList<String> attrNames;
+        private List<String> attrNames;
 
         public CreateTableTask(String tableName) {
             super();
@@ -49,12 +50,12 @@ public abstract class Task {
             return this.tableName;
         }
 
-        public ArrayList<String> getAttrNames() {
+        public List<String> getAttrNames() {
             return this.attrNames;
         }
 
-        public void addAttrName(String attrName) {
-            this.attrNames.add(attrName);
+        public void addAttrNames(Collection<? extends String> attrNames) {
+            this.attrNames.addAll(attrNames);
         }
     }
 
@@ -106,6 +107,25 @@ public abstract class Task {
 
         public boolean isAdding() {
             return this.adding;
+        }
+    }
+
+    public static class InsertTask extends Task {
+        private String tableName;
+        private List<String> values;
+
+        public InsertTask(String tableName, List<String> values) {
+            super();
+            this.tableName = tableName;
+            this.values = values;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+
+        public List<String> getValues() {
+            return this.values;
         }
     }
 }
