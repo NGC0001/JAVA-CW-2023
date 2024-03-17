@@ -266,7 +266,7 @@ public class Grammar {
         ensureValidTableName(tableName);
         String alterTypeStr = tokens.popFront();
         Keyword alterType = Keyword.getByString(alterTypeStr);
-        if (alterType != Keyword.ADD || alterType != Keyword.DROP) {
+        if (alterType != Keyword.ADD && alterType != Keyword.DROP) {
             throw new GrammarException("unknown alter type " + alterTypeStr);
         }
         String attrName = tokens.popFront();

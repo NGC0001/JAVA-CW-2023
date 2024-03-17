@@ -276,6 +276,15 @@ public class Table {
         }
     }
 
+    public void dropAttrField(String attrName) throws DBException {
+        int idx = getAttrFieldIdx(attrName);
+        this.attrNameSet.remove(attrName.toLowerCase());
+        this.attrNames.remove(idx);
+        for (Entity entity : this.entities) {
+            entity.dropAttribute(idx);
+        }
+    }
+
     public int getAttrFieldIdx(String attrName) throws DBException {
         if (attrName == null) {
             throw new DBException.NullObjectException("null attribute name");
@@ -285,19 +294,10 @@ public class Table {
             throw new TableException.InvalidAttributeNameException(attrName, "not exists");
         }
         int idx = 0;
-        while (this.attrNames.get(idx).toLowerCase() != attrNameLower) {
+        while (!this.attrNames.get(idx).toLowerCase().equals(attrNameLower)) {
             ++idx;
         }
         return idx;
-    }
-
-    public void dropAttrField(String attrName) throws DBException {
-        int idx = getAttrFieldIdx(attrName);
-        this.attrNameSet.remove(attrName.toLowerCase());
-        this.attrNames.remove(idx);
-        for (Entity entity : this.entities) {
-            entity.dropAttribute(idx);
-        }
     }
 
     public int getNumberOfAttrFields() {
