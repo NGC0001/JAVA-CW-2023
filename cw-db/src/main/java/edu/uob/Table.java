@@ -11,7 +11,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -96,6 +98,10 @@ public class Table {
             this.attributes = new ArrayList<String>();
         }
 
+        public long getId() {
+            return this.id;
+        }
+
         protected void addAttribute(String attr) throws DBException {
             if (!Grammar.isValidAttributeValue(attr)) {
                 throw new TableException.InvalidAttributeValueException(attr);
@@ -110,6 +116,15 @@ public class Table {
             for (String attr : attributes) {
                 addAttribute(attr);
             }
+        }
+
+        // Caller shall ensure `idx` not out of bounds
+        protected String getAttribute(int idx) {
+            return this.attributes.get(idx);
+        }
+
+        protected List<String> getAttributes() {
+            return this.attributes;
         }
 
         // Caller shall ensure `idx` not out of bounds
@@ -131,6 +146,97 @@ public class Table {
                 str += delim + attr;
             }
             return str;
+        }
+    }
+
+    public static class AttrFieldIndexMapper {
+        private HashMap<String, Integer> mapper;
+
+        protected AttrFieldIndexMapper(List<String> attrNames) {
+            this.mapper = new HashMap<String, Integer>();
+            if (attrNames == null) {
+                return;
+            }
+            for (int i = 0; i < attrNames.size(); ++i) {
+                String attrName = attrNames.get(i);
+                if (attrName == null) {
+                    continue;
+                }
+                this.mapper.put(attrName.toLowerCase(), i);
+            }
+        }
+
+        public int getIndexOf(String attrName) throws DBException {
+            if (attrName == null) {
+                throw new DBException.NullObjectException("mapping from null attribute name");
+            }
+            Integer idx = mapper.get(attrName.toLowerCase());
+            if (idx == null) {
+                throw new TableException.InvalidAttributeNameException(attrName, "no mapping");
+            }
+            return idx.intValue();
+        }
+    }
+
+    public class AttrFieldSelector {
+        private static final int idIdx = -1;
+
+        private List<Integer> selectedIdx;
+        private int idPos;
+
+        protected AttrFieldSelector(List<String> selectedAttrNames) throws DBException {
+            this.selectedIdx = new ArrayList<Integer>();
+            this.idPos = -1;
+            if (selectedAttrNames == null) { // Select all
+                this.idPos = this.selectedIdx.size();
+                this.selectedIdx.add(idIdx);
+                for (int i = 0; i < attrNames.size(); ++i) {
+                    this.selectedIdx.add(i);
+                }
+                return;
+            }
+            AttrFieldIndexMapper idxMapper = getAttrFieldIndexMapper();
+            for (String attrName : selectedAttrNames) {
+                if (Grammar.isIdAttrName(attrName)) {
+                    this.idPos = this.selectedIdx.size();
+                    this.selectedIdx.add(idIdx);
+                    continue;
+                }
+                int idx = idxMapper.getIndexOf(attrName);
+                this.selectedIdx.add(idx);
+            }
+        }
+
+        public List<String> getSelectedAttrNames() throws DBException {
+            ArrayList<String> result = selectFrom(attrNames);
+            if (this.idPos >= 0) {
+                result.set(this.idPos, Grammar.getIdAttrName());
+            }
+            return result;
+        }
+
+        public List<String> getSelectedEntityAttrValues(Entity entity) throws DBException {
+            ArrayList<String> result = selectFrom(entity.getAttributes());
+            if (this.idPos >= 0) {
+                result.set(this.idPos, String.valueOf(entity.getId()));
+            }
+            return result;
+        }
+
+        private ArrayList<String> selectFrom(List<String> originList) throws DBException {
+            ArrayList<String> selected = new ArrayList<String>();
+            for (Integer idx : this.selectedIdx) {
+                int i = idx.intValue();
+                if (originList.size() <= i) {
+                    throw new TableException("selection out of range, table may have changed");
+                }
+                if (i == idIdx) {
+                    selected.add(null);
+                } else {
+                    selected.add(originList.get(i));
+                }
+            }
+            return selected;
         }
     }
 
@@ -223,7 +329,7 @@ public class Table {
         int fieldIdx = 0;
         for (String field : headerFields) {
             field = field.toLowerCase();
-            if (fieldIdx == 0 && !Grammar.getIdAttrName().equals(field)) {
+            if (fieldIdx == 0 && !Grammar.isIdAttrName(field)) {
                 return false;
             }
             if (fieldIdx > 0 && !this.attrNames.get(fieldIdx - 1).toLowerCase().equals(field)) {
@@ -340,6 +446,30 @@ public class Table {
 
     public void clear() {
         this.entities.clear();
+    }
+
+    public AttrFieldIndexMapper getAttrFieldIndexMapper() {
+        return new AttrFieldIndexMapper(this.attrNames);
+    }
+
+    public AttrFieldSelector getAttrFieldSelector(List<String> selectedAttrNames) throws DBException {
+        return new AttrFieldSelector(selectedAttrNames);
+    }
+
+    public List<Entity> chooseEntities(Condition cond) throws DBException {
+        AttrFieldIndexMapper idxMapper = getAttrFieldIndexMapper();
+        List<Entity> chosenEntities = new ArrayList<Entity>();
+        for (Entity e : this.entities) {
+            boolean condHold = cond.evaluate((attrName) -> {
+                int attrIdx = idxMapper.getIndexOf(attrName);
+                String attrValue = e.getAttribute(attrIdx);
+                return attrValue;
+            });
+            if (condHold) {
+                chosenEntities.add(e);
+            }
+        }
+        return chosenEntities;
     }
 
     @Override

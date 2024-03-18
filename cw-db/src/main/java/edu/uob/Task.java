@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-// This class represent an operation on databases.
+// This class represents an operation on databases.
 // It is the parse reuslt of an incomming user command.
 public abstract class Task {
     public Task() {
@@ -126,6 +126,35 @@ public abstract class Task {
 
         public List<String> getValues() {
             return this.values;
+        }
+    }
+
+    public static class SelectTask extends Task {
+        private List<String> selection; // null means to select all
+        private String tableName;
+        private Condition condition;
+
+        public SelectTask(String tableName, List<String> selection, Condition condition) {
+            super();
+            this.selection = selection;
+            this.tableName = tableName;
+            this.condition = condition;
+        }
+
+        public void setCondition(Condition condition) {
+            this.condition = condition;
+        }
+
+        public List<String> getSelection() {
+            return this.selection;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+
+        public Condition getCondition() {
+            return this.condition;
         }
     }
 }

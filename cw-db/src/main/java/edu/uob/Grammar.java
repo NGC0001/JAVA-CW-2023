@@ -16,15 +16,6 @@ public class Grammar {
         public GrammarException(String message) {
             super(message);
         }
-
-        public static class UnknownCommandTypeException extends GrammarException {
-            @Serial
-            private static final long serialVersionUID = 1;
-
-            public UnknownCommandTypeException(String cmdType) {
-                super("unknown command type " + cmdType);
-            }
-        }
     }
 
     public static enum Keyword {
@@ -148,6 +139,119 @@ public class Grammar {
         E extract(TokenList tokens) throws GrammarException;
     }
 
+    public static class AlwaysTrueCondition implements Condition {
+        public AlwaysTrueCondition() {
+        }
+        public boolean evaluate(ValueMapper valueMapper) {
+            return true;
+        }
+    }
+
+    public static class CompoundCondition implements Condition {
+        private Condition condOne;
+        private boolean connectByAnd;
+        private Condition condTwo;
+
+        public CompoundCondition(Condition condOne) {
+            this(condOne, false, null);
+        }
+
+        public CompoundCondition(Condition condOne, boolean connectByAnd, Condition condTwo) {
+            this.condOne = condOne;
+            this.connectByAnd = connectByAnd;
+            this.condTwo = condTwo;
+        }
+
+        public void setNextCond(boolean connectByAnd, Condition nextCond) {
+            this.connectByAnd = connectByAnd;
+            this.condTwo = nextCond;
+        }
+
+        public boolean evaluate(ValueMapper valueMapper) throws DBException {
+            if (valueMapper == null || this.condOne == null) {
+                throw new DBException.NullObjectException("null value mapper or condition");
+            }
+            boolean condOneTrue = this.condOne.evaluate(valueMapper);
+            if (this.condTwo == null) {
+                return condOneTrue;
+            }
+            if (this.connectByAnd) {
+                return condOneTrue && this.condTwo.evaluate(valueMapper);
+            } else { // Connected by or
+                return condOneTrue || this.condTwo.evaluate(valueMapper);
+            }
+        }
+    }
+
+    public static class Comparator implements Condition {
+        private String key;
+        private Keyword cmpOp;
+        private String targetValue;
+
+        public Comparator(String key, Keyword cmpOp, String targetValue) {
+            this.key = key;
+            this.cmpOp = cmpOp;
+            this.targetValue = targetValue;
+        }
+
+        public boolean evaluate(ValueMapper valueMapper) throws DBException {
+            if (valueMapper == null || this.cmpOp == null) {
+                throw new DBException.NullObjectException("null arguments in condition evaluation");
+            }
+            String value = valueMapper.getValueByKey(this.key);
+            if (value == null || this.targetValue == null) {
+                return false;
+            }
+            if (this.cmpOp == Keyword.LIKE) {
+                String valueStr = stripChar(value, '\'');
+                String targetStr = stripChar(this.targetValue, '\'');
+                return valueStr.contains(targetStr);
+            }
+            return arithmeticCompare(value, this.targetValue, this.cmpOp);
+        }
+
+        private static boolean arithmeticCompare(String value, String target, Keyword op) {
+            double cmp = 0;
+            try {
+                long valueLong = Long.valueOf(value);
+                long targetValueLong = Long.valueOf(target);
+                cmp = valueLong - targetValueLong; // long -> double
+            } catch (Exception notLong) {
+                try {
+                    double valueDouble = Double.valueOf(value);
+                    double targetValueDouble = Double.valueOf(target);
+                    cmp = valueDouble - targetValueDouble;
+                } catch (Exception notDouble) {
+                    cmp = value.compareTo(target); // int -> double
+                }
+            }
+            switch (op) {
+                case EQ: return cmp == 0.0;
+                case GT: return cmp > 0.0;
+                case LT: return cmp < 0.0;
+                case GE: return cmp >= 0.0;
+                case LE: return cmp <= 0.0;
+                case NEQ: return cmp != 0.0;
+            }
+            return false;
+        }
+
+        private static String stripChar(String str, char ch) {
+            if (str == null) {
+                return null;
+            }
+            int startPos = 0;
+            while (startPos < str.length() && str.charAt(startPos) == ch) {
+                ++startPos;
+            }
+            int endPos = str.length();
+            while (startPos < endPos && str.charAt(endPos - 1) == ch) {
+                --endPos;
+            }
+            return str.substring(startPos, endPos);
+        }
+    }
+
     private static final String idAttrName = "id";
     private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
 
@@ -162,12 +266,12 @@ public class Grammar {
         String cmdTypeStr = tokens.popFront();
         Keyword cmdType = Keyword.getByString(cmdTypeStr);
         if (cmdType == null) {
-            throw new GrammarException.UnknownCommandTypeException(cmdTypeStr);
+            throw new GrammarException("unknown command type " + cmdTypeStr);
         }
         return parseCommandType(cmdType, tokens);
     }
 
-    private static Task parseCommandType(Keyword cmdType, TokenList tokens) throws DBException {
+    private static Task parseCommandType(Keyword cmdType, TokenList tokens) throws GrammarException {
         switch (cmdType) {
             case USE:
                 return parseUse(tokens);
@@ -176,12 +280,12 @@ public class Grammar {
             case DROP: return parseDrop(tokens);
             case ALTER: return parseAlter(tokens);
             case INSERT: return parseInsert(tokens);
-            case SELECT:
+            case SELECT: return parseSelect(tokens);
             case UPDATE:
             case DELETE:
             case JOIN:
         }
-        throw new GrammarException.UnknownCommandTypeException(cmdType.toString());
+        throw new GrammarException("unknown command type " + cmdType.toString());
     }
 
     private static Task parseUse(TokenList tokens) throws GrammarException {
@@ -225,7 +329,7 @@ public class Grammar {
         }
         ensureIsKeyword(Keyword.LBRACKET, tokens.popFront());
         List<String> attrNames = parseList(tokens, (tokenList) -> {
-            ensureMoreTokens(tokens, "empty or incomplete attribute name list");
+            ensureMoreTokens(tokenList, "empty or incomplete attribute name list");
             String attrName = tokenList.popFront();
             ensureValidAttributeName(attrName);
             return attrName;
@@ -302,6 +406,73 @@ public class Grammar {
         ensurePopKeyword(Keyword.RBRACKET, tokens);
         ensureNoMoreTokens(tokens);
         return new Task.InsertTask(tableName, values);
+    }
+
+    private static Task parseSelect(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "expect selection for select");
+        List<String> selection = null;
+        if (isKeyword(Keyword.STAR, tokens.front())) {
+            tokens.popFront();
+        } else {
+            selection = parseList(tokens, (tokenList) -> {
+                    ensureMoreTokens(tokenList, "incomplete selection list");
+                    String attrName = tokenList.popFront();
+                    ensureValidAttrSelectName(attrName);
+                    return attrName;
+            });
+        }
+        ensurePopKeyword(Keyword.FROM, tokens);
+        ensureMoreTokens(tokens, "expect table name for insertion");
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        Task.SelectTask task = new Task.SelectTask(tableName, selection, new AlwaysTrueCondition());
+        if (tokens.empty()) {
+            return task;
+        }
+        ensurePopKeyword(Keyword.WHERE, tokens);
+        task.setCondition(parseCondition(tokens));
+        ensureNoMoreTokens(tokens);
+        return task;
+    }
+
+    private static CompoundCondition parseCondition(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "expect a condition");
+        Condition condOne;
+        if (isKeyword(Keyword.LBRACKET, tokens.front())) {
+            tokens.popFront();
+            condOne = parseCondition(tokens);
+            ensurePopKeyword(Keyword.RBRACKET, tokens);
+        } else {
+            condOne = parseComparator(tokens);
+        }
+        CompoundCondition cond = new CompoundCondition(condOne);
+        if (tokens.empty()) {
+            return cond;
+        }
+        Keyword connection = Keyword.getByString(tokens.front());
+        if (connection == Keyword.AND || connection == Keyword.OR) {
+            tokens.popFront();
+            Condition condTwo = parseCondition(tokens);
+            cond.setNextCond(connection == Keyword.AND, condTwo);
+        }
+        return cond;
+    }
+
+    private static Comparator parseComparator(TokenList tokens) throws GrammarException {
+        if (tokens.size() < 3) {
+            throw new GrammarException("expect a comparator");
+        }
+        String attrName = tokens.popFront();
+        ensureValidAttributeName(attrName);
+        String cmpOpStr = tokens.popFront();
+        Keyword cmpOp = Keyword.getByString(cmpOpStr);
+        if (cmpOp == null) {
+            throw new GrammarException("invalid comparison op " + cmpOpStr);
+        }
+        String value = tokens.popFront();
+        ensureValidAttributeValue(value);
+        Comparator cmp = new Comparator(attrName, cmpOp, value);
+        return cmp;
     }
 
     private static <E> List<E> parseList(TokenList tokens, ElementExtractor<E> extractor) throws GrammarException {
@@ -432,17 +603,28 @@ public class Grammar {
         return plainTextMatcher.matches();
     }
 
-    public static boolean isValidDatabaseName(String str) {
+    public static boolean isIdAttrName(String str) {
+        return str != null && getIdAttrName().equals(str.toLowerCase());
+    }
+
+    public static boolean isValidNameString(String str) {
         return str != null && isPlainText(str) && !isKeyword(str);
+    }
+
+    public static boolean isValidDatabaseName(String str) {
+        return isValidNameString(str);
     }
 
     public static boolean isValidTableName(String str) {
-        return str != null && isPlainText(str) && !isKeyword(str);
+        return isValidNameString(str);
     }
 
     public static boolean isValidAttributeName(String str) {
-        return str != null && isPlainText(str) && !isKeyword(str)
-                && !getIdAttrName().equals(str.toLowerCase());
+        return isValidNameString(str) && !isIdAttrName(str);
+    }
+
+    public static boolean isValidAttrSelectName(String str) {
+        return isValidNameString(str);
     }
 
     public static boolean isValidAttributeValue(String str) {
@@ -464,6 +646,12 @@ public class Grammar {
 
     private static void ensureValidAttributeName(String attrName) throws GrammarException {
         if (!isValidAttributeName(attrName)) {
+            throw new GrammarException("invalid attribute name " + attrName);
+        }
+    }
+
+    private static void ensureValidAttrSelectName(String attrName) throws GrammarException {
+        if (!isValidAttrSelectName(attrName)) {
             throw new GrammarException("invalid attribute name " + attrName);
         }
     }

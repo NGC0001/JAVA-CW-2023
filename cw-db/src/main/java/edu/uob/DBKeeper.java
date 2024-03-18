@@ -9,6 +9,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -140,6 +141,8 @@ public class DBKeeper {
             return executeAlter((Task.AlterTask) task);
         } else if (task instanceof Task.InsertTask) {
             return executeInsert((Task.InsertTask) task);
+        } else if (task instanceof Task.SelectTask) {
+            return executeSelect((Task.SelectTask) task);
         } else {
             throw new DBException("executing unknown type of task");
         }
@@ -195,6 +198,18 @@ public class DBKeeper {
         table.addEntity(task.getValues());
         setUpdatedByTask();
         return new Result();
+    }
+
+    private Result executeSelect(Task.SelectTask task) throws DBException {
+        Table table = getCurrentDatabase().getTable(task.getTableName());
+        List<Table.Entity> chosenEntities = table.chooseEntities(task.getCondition());
+        Table.AttrFieldSelector attrSelector = table.getAttrFieldSelector(task.getSelection());
+        Result result = new Result();
+        result.addRow(attrSelector.getSelectedAttrNames());
+        for (Table.Entity e : chosenEntities) {
+            result.addRow(attrSelector.getSelectedEntityAttrValues(e));
+        }
+        return result;
     }
 
     public void addDatabase(String databaseName, Database db) throws DBException {
