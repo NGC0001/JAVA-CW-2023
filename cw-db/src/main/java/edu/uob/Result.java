@@ -33,11 +33,11 @@ public class Result {
         this.tab.add(row);
     }
 
-    private String formatRow(List<String> row) {
+    private String formatRow(List<String> row, String delim) {
         String str = "";
         for (int col = 0; col < row.size(); ++col) {
             if (col > 0) {
-                str += " ";
+                str += delim;
             }
             String field = row.get(col);
             if (field == null) {
@@ -50,9 +50,13 @@ public class Result {
     }
 
     public String exportToString() {
+        return exportToString("  ");
+    }
+
+    public String exportToString(String delim) {
         String str = "";
         for (List<String> row : tab) {
-            str += formatRow(row) + "\n";
+            str += formatRow(row, delim) + "\n";
         }
         return str;
     }

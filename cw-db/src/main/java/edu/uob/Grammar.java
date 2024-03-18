@@ -203,52 +203,56 @@ public class Grammar {
                 return false;
             }
             if (this.cmpOp == Keyword.LIKE) {
-                String valueStr = stripChar(value, '\'');
-                String targetStr = stripChar(this.targetValue, '\'');
-                return valueStr.contains(targetStr);
+                String valueStr = stripSingleQuote(value);
+                String targetValueStr = stripSingleQuote(this.targetValue);
+                return valueStr.contains(targetValueStr);
             }
             return arithmeticCompare(value, this.targetValue, this.cmpOp);
         }
 
-        private static boolean arithmeticCompare(String value, String target, Keyword op) {
-            double cmp = 0;
-            try {
-                long valueLong = Long.valueOf(value);
-                long targetValueLong = Long.valueOf(target);
-                cmp = valueLong - targetValueLong; // long -> double
-            } catch (Exception notLong) {
-                try {
-                    double valueDouble = Double.valueOf(value);
-                    double targetValueDouble = Double.valueOf(target);
-                    cmp = valueDouble - targetValueDouble;
-                } catch (Exception notDouble) {
-                    cmp = value.compareTo(target); // int -> double
-                }
-            }
+        private static boolean arithmeticCompare(String value, String targetValue, Keyword op) {
+            double diff = arithmeticDiff(value, targetValue);
             switch (op) {
-                case EQ: return cmp == 0.0;
-                case GT: return cmp > 0.0;
-                case LT: return cmp < 0.0;
-                case GE: return cmp >= 0.0;
-                case LE: return cmp <= 0.0;
-                case NEQ: return cmp != 0.0;
+                case EQ: return diff == 0.0;
+                case GT: return diff > 0.0;
+                case LT: return diff < 0.0;
+                case GE: return diff >= 0.0;
+                case LE: return diff <= 0.0;
+                case NEQ: return diff != 0.0;
             }
             return false;
         }
 
-        private static String stripChar(String str, char ch) {
-            if (str == null) {
-                return null;
+        private static double arithmeticDiff(String value, String targetValue) {
+            try { // Both integer
+                long valueLong = Long.valueOf(value);
+                long targetValueLong = Long.valueOf(targetValue);
+                return (double)(valueLong - targetValueLong); // long -> double
+            } catch (Exception notLong) {
             }
-            int startPos = 0;
-            while (startPos < str.length() && str.charAt(startPos) == ch) {
-                ++startPos;
+            try { // One double, the other double or integer
+                double valueDouble = Double.valueOf(value);
+                double targetValueDouble = Double.valueOf(targetValue);
+                return valueDouble - targetValueDouble;
+            } catch (Exception notDouble) {
             }
-            int endPos = str.length();
-            while (startPos < endPos && str.charAt(endPos - 1) == ch) {
-                --endPos;
+            if (isKeyword(value) && isKeyword(targetValue)) {
+                value = value.toLowerCase();
+                targetValue = targetValue.toLowerCase();
             }
-            return str.substring(startPos, endPos);
+            String valueStr = stripSingleQuote(value);
+            String targetValueStr = stripSingleQuote(targetValue);
+            return (double)(valueStr.compareTo(targetValueStr)); // int -> double
+        }
+
+        private static String stripSingleQuote(String str) {
+            final char singleQuote = '\'';
+            int strLen = str.length();
+            if (strLen >= 2 && str.charAt(0) == singleQuote
+                    && str.charAt(strLen - 1) == singleQuote) {
+                return str.substring(1, strLen - 1);
+            }
+            return str;
         }
     }
 
@@ -417,7 +421,7 @@ public class Grammar {
             selection = parseList(tokens, (tokenList) -> {
                     ensureMoreTokens(tokenList, "incomplete selection list");
                     String attrName = tokenList.popFront();
-                    ensureValidAttrSelectName(attrName);
+                    ensureValidAttrOrIdName(attrName);
                     return attrName;
             });
         }
@@ -463,7 +467,7 @@ public class Grammar {
             throw new GrammarException("expect a comparator");
         }
         String attrName = tokens.popFront();
-        ensureValidAttributeName(attrName);
+        ensureValidAttrOrIdName(attrName);
         String cmpOpStr = tokens.popFront();
         Keyword cmpOp = Keyword.getByString(cmpOpStr);
         if (cmpOp == null) {
@@ -619,11 +623,13 @@ public class Grammar {
         return isValidNameString(str);
     }
 
+    // Is valid attribute name, but not "id"
     public static boolean isValidAttributeName(String str) {
         return isValidNameString(str) && !isIdAttrName(str);
     }
 
-    public static boolean isValidAttrSelectName(String str) {
+    // Is valid attribute name, including "id"
+    public static boolean isValidAttrOrIdName(String str) {
         return isValidNameString(str);
     }
 
@@ -650,8 +656,8 @@ public class Grammar {
         }
     }
 
-    private static void ensureValidAttrSelectName(String attrName) throws GrammarException {
-        if (!isValidAttrSelectName(attrName)) {
+    private static void ensureValidAttrOrIdName(String attrName) throws GrammarException {
+        if (!isValidAttrOrIdName(attrName)) {
             throw new GrammarException("invalid attribute name " + attrName);
         }
     }

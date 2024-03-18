@@ -461,9 +461,11 @@ public class Table {
         List<Entity> chosenEntities = new ArrayList<Entity>();
         for (Entity e : this.entities) {
             boolean condHold = cond.evaluate((attrName) -> {
+                if (Grammar.isIdAttrName(attrName)) {
+                    return String.valueOf(e.getId());
+                }
                 int attrIdx = idxMapper.getIndexOf(attrName);
-                String attrValue = e.getAttribute(attrIdx);
-                return attrValue;
+                return e.getAttribute(attrIdx);
             });
             if (condHold) {
                 chosenEntities.add(e);
