@@ -30,7 +30,7 @@ public class Result {
                 columnWidth.set(col, str.length());
             }
         }
-        this.tab.add(row);
+        this.tab.add(row); // `row` not copied
     }
 
     private String formatRow(List<String> row, String delim) {

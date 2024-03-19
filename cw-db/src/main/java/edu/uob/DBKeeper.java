@@ -102,12 +102,14 @@ public class DBKeeper {
         addDatabase(dbName, db);
     }
 
+    // Files.createDirectories/Paths.get/Files.write also throws RuntimeException
     public void storeToDirectory(String directoryPath) throws DBException, IOException {
         if (directoryPath == null) {
             throw new DBException.NullObjectException(
                     "storing database keeper to null directory");
         }
         Path metaFilePath = Paths.get(directoryPath, databasesMetaFileName);
+        Files.createDirectories(metaFilePath.getParent());
         ArrayList<String> dbDescriptions = new ArrayList<String>();
         for (Map.Entry<String, Database> entry : this.databases.entrySet()) {
             String dbName = entry.getKey();
@@ -143,6 +145,12 @@ public class DBKeeper {
             return executeInsert((Task.InsertTask) task);
         } else if (task instanceof Task.SelectTask) {
             return executeSelect((Task.SelectTask) task);
+        } else if (task instanceof Task.UpdateTask) {
+            return executeUpdate((Task.UpdateTask) task);
+        } else if (task instanceof Task.DeleteTask) {
+            return executeDelete((Task.DeleteTask) task);
+        } else if (task instanceof Task.JoinTask) {
+            return executeJoin((Task.JoinTask) task);
         } else {
             throw new DBException("executing unknown type of task");
         }
@@ -201,15 +209,85 @@ public class DBKeeper {
     }
 
     private Result executeSelect(Task.SelectTask task) throws DBException {
+        // Better to implement inside Table class
         Table table = getCurrentDatabase().getTable(task.getTableName());
         List<Table.Entity> chosenEntities = table.chooseEntities(task.getCondition());
-        Table.AttrFieldSelector attrSelector = table.getAttrFieldSelector(task.getSelection());
+        List<String> attrSelection = task.getSelection();
+        Table.AttrIdFieldGetter attrGetter = table.getAttrIdFieldGetter(attrSelection);
         Result result = new Result();
-        result.addRow(attrSelector.getSelectedAttrNames());
+        result.addRow(attrGetter.getSelectedAttrNames());
         for (Table.Entity e : chosenEntities) {
-            result.addRow(attrSelector.getSelectedEntityAttrValues(e));
+            result.addRow(attrGetter.getSelectedValues(e));
         }
         return result;
+    }
+
+    private Result executeUpdate(Task.UpdateTask task) throws DBException {
+        // Better to implement inside Table class
+        Table table = getCurrentDatabase().getTable(task.getTableName());
+        List<Table.Entity> chosenEntities = table.chooseEntities(task.getCondition());
+        Result result = new Result();
+        if (chosenEntities.isEmpty()) {
+            return result;
+        }
+        Table.AttrFieldSetter attrSetter = table.getAttrFieldSetter(task.getModification());
+        setUpdatedByTask();
+        for (Table.Entity entity : chosenEntities) {
+            attrSetter.setSelectedAttrValues(entity); // Shall not throw here
+        }
+        return result;
+    }
+
+    private Result executeDelete(Task.DeleteTask task) throws DBException {
+        Table table = getCurrentDatabase().getTable(task.getTableName());
+        if (table.deleteEntities(task.getCondition())) {
+            setUpdatedByTask();
+        }
+        return new Result();
+    }
+
+    private Result executeJoin(Task.JoinTask task) throws DBException {
+        // Better to implement inside Database class
+        String tableNameOne = task.getTableNameOne();
+        String tableNameTwo = task.getTableNameTwo();
+        if (tableNameOne.toLowerCase().equals(tableNameTwo.toLowerCase())) {
+            throw new DBException.InvalidTableNameException(tableNameTwo, "need another table");
+        }
+        Table tableOne = getCurrentDatabase().getTable(tableNameOne);
+        Table tableTwo = getCurrentDatabase().getTable(tableNameTwo);
+        String attrOne = task.getAttrNameOne();
+        String attrTwo = task.getAttrNameTwo();
+        int idxOne = Grammar.isIdAttrName(attrOne) ? Table.Entity.idIdx : tableOne.getAttrIdx(attrOne);
+        int idxTwo = Grammar.isIdAttrName(attrTwo) ? Table.Entity.idIdx : tableTwo.getAttrIdx(attrTwo);
+        Result result = new Result();
+        List<String> header = new ArrayList<String>();
+        header.add(Grammar.getIdAttrName());
+        for (String attrName : tableOne.getAttributeNames()) {
+            header.add(tableNameOne + "." + attrName);
+        }
+        for (String attrName : tableTwo.getAttributeNames()) {
+            header.add(tableNameTwo + "." + attrName);
+        }
+        result.addRow(header);
+        joinTables(tableOne, tableTwo, idxOne, idxTwo, result);
+        return result;
+    }
+
+    private void joinTables(Table t1, Table t2, int idx1, int idx2, Result result) throws DBException {
+        int nextId = 0;
+        for (Table.Entity e1 : t1.getEntities()) {
+            for (Table.Entity e2 : t2.getEntities()) {
+                String v1 = e1.getAttributeOrId(idx1);
+                String v2 = e2.getAttributeOrId(idx2);
+                if (Grammar.arithmeticDiff(v1, v2) == 0.0) {
+                    List<String> valueRow = new ArrayList<String>();
+                    valueRow.add(String.valueOf(nextId++));
+                    valueRow.addAll(e1.getAttributes());
+                    valueRow.addAll(e2.getAttributes());
+                    result.addRow(valueRow);
+                }
+            }
+        }
     }
 
     public void addDatabase(String databaseName, Database db) throws DBException {

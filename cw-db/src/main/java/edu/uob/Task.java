@@ -1,8 +1,10 @@
 package edu.uob;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 // This class represents an operation on databases.
 // It is the parse reuslt of an incomming user command.
@@ -155,6 +157,81 @@ public abstract class Task {
 
         public Condition getCondition() {
             return this.condition;
+        }
+    }
+
+    public static class UpdateTask extends Task {
+        private List<Map.Entry<String, String>> modification;
+        private String tableName;
+        private Condition condition;
+
+        public UpdateTask(String tableName, List<Map.Entry<String, String>> modification, Condition condition) {
+            super();
+            this.modification = modification;
+            this.tableName = tableName;
+            this.condition = condition;
+        }
+
+        public List<Map.Entry<String, String>> getModification() {
+            return this.modification;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+
+        public Condition getCondition() {
+            return this.condition;
+        }
+    }
+
+    public static class DeleteTask extends Task {
+        private String tableName;
+        private Condition condition;
+
+        public DeleteTask(String tableName, Condition condition) {
+            super();
+            this.tableName = tableName;
+            this.condition = condition;
+        }
+
+        public String getTableName() {
+            return this.tableName;
+        }
+
+        public Condition getCondition() {
+            return this.condition;
+        }
+    }
+
+    public static class JoinTask extends Task {
+        private String tableNameOne;
+        private String tableNameTwo;
+        private String attrNameOne;
+        private String attrNameTwo;
+
+        public JoinTask(String tableNameOne, String tableNameTwo, String attrNameOne, String attrNameTwo) {
+            super();
+            this.tableNameOne = tableNameOne;
+            this.tableNameTwo = tableNameTwo;
+            this.attrNameOne = attrNameOne;
+            this.attrNameTwo = attrNameTwo;
+        }
+
+        public String getTableNameOne() {
+            return this.tableNameOne;
+        }
+
+        public String getTableNameTwo() {
+            return this.tableNameTwo;
+        }
+
+        public String getAttrNameOne() {
+            return this.attrNameOne;
+        }
+
+        public String getAttrNameTwo() {
+            return this.attrNameTwo;
         }
     }
 }

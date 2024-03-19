@@ -14,10 +14,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // This class represents a talbe of a database.
+// Some error checkings are done twice:
+// in parsing by Grammar class, and here by Table class.
 public class Table {
     public static class TableException extends DBException {
         @Serial
@@ -67,6 +70,15 @@ public class Table {
             }
         }
 
+        public static class InvalidAttributeIndexException extends TableException {
+            @Serial
+            private static final long serialVersionUID = 1;
+
+            public InvalidAttributeIndexException(int idx) {
+                super("attribute index out of range: " + idx);
+            }
+        }
+
         public static class NegativeEntityIdException extends TableException {
             @Serial
             private static final long serialVersionUID = 1;
@@ -87,6 +99,8 @@ public class Table {
     }
 
     public static class Entity {
+        public static final int idIdx = -99;
+
         private final long id;
         private ArrayList<String> attributes;
 
@@ -118,18 +132,37 @@ public class Table {
             }
         }
 
-        // Caller shall ensure `idx` not out of bounds
-        protected String getAttribute(int idx) {
+        // Caller shall ensure `value` is valid attribute value
+        protected void setAttribute(int idx, String value) throws DBException {
+            if (idx < 0 || getNumberOfAttributes() <= idx) {
+                throw new TableException.InvalidAttributeIndexException(idx);
+            }
+            this.attributes.set(idx, value);
+        }
+
+        public String getAttributeOrId(int idx) throws DBException {
+            if (idx == idIdx) {
+                return String.valueOf(getId());
+            }
+            if (idx < 0 || getNumberOfAttributes() <= idx) {
+                throw new TableException.InvalidAttributeIndexException(idx);
+            }
             return this.attributes.get(idx);
         }
 
-        protected List<String> getAttributes() {
-            return this.attributes;
+        protected void dropAttribute(int idx) throws DBException {
+            if (idx < 0 || getNumberOfAttributes() <= idx) {
+                throw new TableException.InvalidAttributeIndexException(idx);
+            }
+            this.attributes.remove(idx);
         }
 
-        // Caller shall ensure `idx` not out of bounds
-        protected void dropAttribute(int idx) {
-            this.attributes.remove(idx);
+        public List<String> getAttributes() {
+            return new ArrayList<String>(this.attributes);
+        }
+
+        public int getNumberOfAttributes() {
+            return this.attributes.size();
         }
 
         @Override
@@ -149,19 +182,16 @@ public class Table {
         }
     }
 
-    public static class AttrFieldIndexMapper {
+    // Get the index of an attribute, return Entity.idIdx for "id"
+    // Invalid after table changed
+    public class AttrIdFieldIndexMapper {
         private HashMap<String, Integer> mapper;
 
-        protected AttrFieldIndexMapper(List<String> attrNames) {
+        protected AttrIdFieldIndexMapper() {
             this.mapper = new HashMap<String, Integer>();
-            if (attrNames == null) {
-                return;
-            }
+            this.mapper.put(Grammar.getIdAttrName().toLowerCase(), Entity.idIdx);
             for (int i = 0; i < attrNames.size(); ++i) {
                 String attrName = attrNames.get(i);
-                if (attrName == null) {
-                    continue;
-                }
                 this.mapper.put(attrName.toLowerCase(), i);
             }
         }
@@ -178,65 +208,79 @@ public class Table {
         }
     }
 
-    public class AttrFieldSelector {
-        private static final int idIdx = -1;
-
+    // Get selected attributes/id of an entity
+    // Invalid after table changed
+    public class AttrIdFieldGetter {
+        private List<String> selectedAttr;
         private List<Integer> selectedIdx;
-        private int idPos;
 
-        protected AttrFieldSelector(List<String> selectedAttrNames) throws DBException {
+        protected AttrIdFieldGetter(List<String> selectedAttrNames) throws DBException {
+            this.selectedAttr = new ArrayList<String>();
             this.selectedIdx = new ArrayList<Integer>();
-            this.idPos = -1;
             if (selectedAttrNames == null) { // Select all
-                this.idPos = this.selectedIdx.size();
-                this.selectedIdx.add(idIdx);
+                this.selectedAttr.add(Grammar.getIdAttrName());
+                this.selectedIdx.add(Entity.idIdx);
+                this.selectedAttr.addAll(attrNames);
                 for (int i = 0; i < attrNames.size(); ++i) {
                     this.selectedIdx.add(i);
                 }
-                return;
-            }
-            AttrFieldIndexMapper idxMapper = getAttrFieldIndexMapper();
-            for (String attrName : selectedAttrNames) {
-                if (Grammar.isIdAttrName(attrName)) {
-                    this.idPos = this.selectedIdx.size();
-                    this.selectedIdx.add(idIdx);
-                    continue;
+            } else {
+                this.selectedAttr.addAll(selectedAttrNames);
+                AttrIdFieldIndexMapper idxMapper = getAttrIdFieldIndexMapper();
+                for (String attrName : selectedAttrNames) {
+                    int idx = idxMapper.getIndexOf(attrName);
+                    this.selectedIdx.add(idx);
                 }
-                int idx = idxMapper.getIndexOf(attrName);
-                this.selectedIdx.add(idx);
             }
         }
 
         public List<String> getSelectedAttrNames() throws DBException {
-            ArrayList<String> result = selectFrom(attrNames);
-            if (this.idPos >= 0) {
-                result.set(this.idPos, Grammar.getIdAttrName());
-            }
-            return result;
+            return new ArrayList<String>(this.selectedAttr);
         }
 
-        public List<String> getSelectedEntityAttrValues(Entity entity) throws DBException {
-            ArrayList<String> result = selectFrom(entity.getAttributes());
-            if (this.idPos >= 0) {
-                result.set(this.idPos, String.valueOf(entity.getId()));
-            }
-            return result;
-        }
-
-        private ArrayList<String> selectFrom(List<String> originList) throws DBException {
+        public List<String> getSelectedValues(Entity entity) throws DBException {
             ArrayList<String> selected = new ArrayList<String>();
             for (Integer idx : this.selectedIdx) {
                 int i = idx.intValue();
-                if (originList.size() <= i) {
-                    throw new TableException("selection out of range, table may have changed");
-                }
-                if (i == idIdx) {
-                    selected.add(null);
-                } else {
-                    selected.add(originList.get(i));
-                }
+                selected.add(entity.getAttributeOrId(i));
             }
             return selected;
+        }
+    }
+
+    // Set selected attributes of an entity
+    // Invalid after table changed
+    public class AttrFieldSetter {
+        private HashMap<Integer, String> modifiedValues;
+
+        protected AttrFieldSetter(List<Map.Entry<String, String>> modification) throws DBException {
+            this.modifiedValues = new HashMap<Integer, String>();
+            if (modification == null) {
+                return;
+            }
+            AttrIdFieldIndexMapper idxMapper = getAttrIdFieldIndexMapper();
+            for (Map.Entry<String, String> entry : modification) {
+                String attrName = entry.getKey();
+                int attrIdx = idxMapper.getIndexOf(attrName);
+                if (attrIdx == Entity.idIdx) {
+                    throw new TableException.InvalidAttributeNameException(attrName, "cannot modify id");
+                }
+                String attrValue = entry.getValue();
+                if (!Grammar.isValidAttributeValue(attrValue)) {
+                    throw new TableException.InvalidAttributeValueException(attrValue);
+                }
+                String prevModification = modifiedValues.put(attrIdx, attrValue);
+                if (prevModification != null) {
+                    throw new TableException.InvalidAttributeNameException(attrName, "modified twice");
+                }
+            }
+        }
+
+        public void setSelectedAttrValues(Entity entity) throws DBException {
+            for (Map.Entry<Integer, String> entry : this.modifiedValues.entrySet()) {
+                int idx = entry.getKey().intValue();
+                entity.setAttribute(idx, entry.getValue());
+            }
         }
     }
 
@@ -246,8 +290,8 @@ public class Table {
 
     private long nextId;
     private HashSet<String> attrNameSet;
-    private ArrayList<String> attrNames;
-    private ArrayList<Entity> entities;
+    private List<String> attrNames;
+    private List<Entity> entities;
 
     public Table() throws DBException {
         this(0);
@@ -383,7 +427,7 @@ public class Table {
     }
 
     public void dropAttrField(String attrName) throws DBException {
-        int idx = getAttrFieldIdx(attrName);
+        int idx = getAttrIdx(attrName);
         this.attrNameSet.remove(attrName.toLowerCase());
         this.attrNames.remove(idx);
         for (Entity entity : this.entities) {
@@ -391,7 +435,7 @@ public class Table {
         }
     }
 
-    public int getAttrFieldIdx(String attrName) throws DBException {
+    public int getAttrIdx(String attrName) throws DBException {
         if (attrName == null) {
             throw new DBException.NullObjectException("null attribute name");
         }
@@ -404,6 +448,10 @@ public class Table {
             ++idx;
         }
         return idx;
+    }
+
+    public List<String> getAttributeNames() {
+        return new ArrayList<String>(this.attrNames);
     }
 
     public int getNumberOfAttrFields() {
@@ -444,34 +492,53 @@ public class Table {
         addEntity(entityId, attrValues);
     }
 
+    // Dangerous
+    protected List<Entity> getEntities() {
+        return this.entities;
+    }
+
+    public int getNumberOfEntities() {
+        return this.entities.size();
+    }
+
     public void clear() {
         this.entities.clear();
     }
 
-    public AttrFieldIndexMapper getAttrFieldIndexMapper() {
-        return new AttrFieldIndexMapper(this.attrNames);
+    public AttrIdFieldIndexMapper getAttrIdFieldIndexMapper() {
+        return new AttrIdFieldIndexMapper();
     }
 
-    public AttrFieldSelector getAttrFieldSelector(List<String> selectedAttrNames) throws DBException {
-        return new AttrFieldSelector(selectedAttrNames);
+    public AttrIdFieldGetter getAttrIdFieldGetter(List<String> selectedAttrNames) throws DBException {
+        return new AttrIdFieldGetter(selectedAttrNames);
+    }
+
+    public AttrFieldSetter getAttrFieldSetter(List<Map.Entry<String, String>> modification) throws DBException {
+        return new AttrFieldSetter(modification);
     }
 
     public List<Entity> chooseEntities(Condition cond) throws DBException {
-        AttrFieldIndexMapper idxMapper = getAttrFieldIndexMapper();
+        AttrIdFieldIndexMapper idxMapper = getAttrIdFieldIndexMapper();
         List<Entity> chosenEntities = new ArrayList<Entity>();
         for (Entity e : this.entities) {
             boolean condHold = cond.evaluate((attrName) -> {
-                if (Grammar.isIdAttrName(attrName)) {
-                    return String.valueOf(e.getId());
-                }
                 int attrIdx = idxMapper.getIndexOf(attrName);
-                return e.getAttribute(attrIdx);
+                return e.getAttributeOrId(attrIdx);
             });
             if (condHold) {
                 chosenEntities.add(e);
             }
         }
         return chosenEntities;
+    }
+
+    public boolean deleteEntities(Condition cond) throws DBException {
+        List<Entity> leftEntities = chooseEntities(Condition.negate(cond));
+        if (leftEntities.size() == getNumberOfEntities()) {
+            return false;
+        }
+        this.entities = leftEntities;
+        return true;
     }
 
     @Override

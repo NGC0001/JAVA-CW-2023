@@ -101,7 +101,7 @@ public class Database {
             throw new DBException.NullObjectException(
                     "getting table name from null objects");
         }
-        String tableFileName = tableName + "." + table.getNextId() + "." + tableFileNameSuffix;
+        String tableFileName = tableName + "." + tableFileNameSuffix;
         if (fileNamePrefix != null) {
             tableFileName = fileNamePrefix + "." + tableFileName;
         }

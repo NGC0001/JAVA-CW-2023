@@ -56,6 +56,7 @@ public class DBServer {
             }
             return formatResponse(result);
         } catch (Exception e) {
+            System.err.println("exception in command handling: " + e);
             return formatResponse(e);
         }
     }

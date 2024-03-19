@@ -1,9 +1,11 @@
 package edu.uob;
 
 import java.io.Serial;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,6 +47,8 @@ public class Grammar {
         NULL("null"),
 
         STAR("*"),
+
+        ASSIGN("="),
 
         EQ("=="),
         NEQ("!="),
@@ -222,46 +226,45 @@ public class Grammar {
             }
             return false;
         }
-
-        private static double arithmeticDiff(String value, String targetValue) {
-            try { // Both integer
-                long valueLong = Long.valueOf(value);
-                long targetValueLong = Long.valueOf(targetValue);
-                return (double)(valueLong - targetValueLong); // long -> double
-            } catch (Exception notLong) {
-            }
-            try { // One double, the other double or integer
-                double valueDouble = Double.valueOf(value);
-                double targetValueDouble = Double.valueOf(targetValue);
-                return valueDouble - targetValueDouble;
-            } catch (Exception notDouble) {
-            }
-            if (isKeyword(value) && isKeyword(targetValue)) {
-                value = value.toLowerCase();
-                targetValue = targetValue.toLowerCase();
-            }
-            String valueStr = stripSingleQuote(value);
-            String targetValueStr = stripSingleQuote(targetValue);
-            return (double)(valueStr.compareTo(targetValueStr)); // int -> double
-        }
-
-        private static String stripSingleQuote(String str) {
-            final char singleQuote = '\'';
-            int strLen = str.length();
-            if (strLen >= 2 && str.charAt(0) == singleQuote
-                    && str.charAt(strLen - 1) == singleQuote) {
-                return str.substring(1, strLen - 1);
-            }
-            return str;
-        }
     }
 
     private static final String idAttrName = "id";
     private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
 
+    public static double arithmeticDiff(String value, String targetValue) {
+        try { // Both integer
+            long valueLong = Long.valueOf(value);
+            long targetValueLong = Long.valueOf(targetValue);
+            return (double)(valueLong - targetValueLong); // long -> double
+        } catch (Exception notLong) {
+        }
+        try { // One double, the other double or integer
+            double valueDouble = Double.valueOf(value);
+            double targetValueDouble = Double.valueOf(targetValue);
+            return valueDouble - targetValueDouble;
+        } catch (Exception notDouble) {
+        }
+        if (isKeyword(value) && isKeyword(targetValue)) {
+            value = value.toLowerCase();
+            targetValue = targetValue.toLowerCase();
+        }
+        String valueStr = stripSingleQuote(value);
+        String targetValueStr = stripSingleQuote(targetValue);
+        return (double)(valueStr.compareTo(targetValueStr)); // int -> double
+    }
+
+    private static String stripSingleQuote(String str) {
+        final char singleQuote = '\'';
+        int strLen = str.length();
+        if (strLen >= 2 && str.charAt(0) == singleQuote
+                && str.charAt(strLen - 1) == singleQuote) {
+            return str.substring(1, strLen - 1);
+        }
+        return str;
+    }
+
     public static Task parseCommand(String command) throws DBException {
         TokenList tokens = new TokenList(getTokensFromString(command));
-        System.out.println("command tokens: " + tokens);
         ensureMoreTokens(tokens, "empty command");
         if (!isKeyword(Keyword.SEMICOLON, tokens.popBack())) {
             throw new GrammarException("command not closed by semicolon");
@@ -285,9 +288,9 @@ public class Grammar {
             case ALTER: return parseAlter(tokens);
             case INSERT: return parseInsert(tokens);
             case SELECT: return parseSelect(tokens);
-            case UPDATE:
-            case DELETE:
-            case JOIN:
+            case UPDATE: return parseUpdate(tokens);
+            case DELETE: return parseDelete(tokens);
+            case JOIN: return parseJoin(tokens);
         }
         throw new GrammarException("unknown command type " + cmdType.toString());
     }
@@ -439,6 +442,59 @@ public class Grammar {
         return task;
     }
 
+    private static Task parseUpdate(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "expect table name for update");
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        ensurePopKeyword(Keyword.SET, tokens);
+        List<Map.Entry<String, String>> modification = parseList(tokens, (tokenList) -> {
+                if (tokenList.size() < 3) {
+                    throw new GrammarException("empty or incomplete name-value pair");
+                }
+                String attrName = tokenList.popFront();
+                ensureValidAttributeName(attrName);
+                ensurePopKeyword(Keyword.ASSIGN, tokens);
+                String attrValue = tokenList.popFront();
+                ensureValidAttributeValue(attrValue);
+                return new AbstractMap.SimpleEntry<String, String>(attrName, attrValue);
+        });
+        ensurePopKeyword(Keyword.WHERE, tokens);
+        Condition cond = parseCondition(tokens);
+        ensureNoMoreTokens(tokens);
+        return new Task.UpdateTask(tableName, modification, cond);
+    }
+
+    private static Task parseDelete(TokenList tokens) throws GrammarException {
+        ensurePopKeyword(Keyword.FROM, tokens);
+        ensureMoreTokens(tokens, "expect table name for delete");
+        String tableName = tokens.popFront();
+        ensureValidTableName(tableName);
+        ensurePopKeyword(Keyword.WHERE, tokens);
+        Condition cond = parseCondition(tokens);
+        ensureNoMoreTokens(tokens);
+        return new Task.DeleteTask(tableName, cond);
+    }
+
+    private static Task parseJoin(TokenList tokens) throws GrammarException {
+        ensureMoreTokens(tokens, "expect table name one for update"); // Table one
+        String tableNameOne = tokens.popFront();
+        ensureValidTableName(tableNameOne);
+        ensurePopKeyword(Keyword.AND, tokens); // AND
+        ensureMoreTokens(tokens, "expect table name tow for update"); // Table two
+        String tableNameTwo = tokens.popFront();
+        ensureValidTableName(tableNameTwo);
+        ensurePopKeyword(Keyword.ON, tokens); // ON
+        ensureMoreTokens(tokens, "expect attribute name one for update"); // Attr one
+        String attrNameOne = tokens.popFront();
+        ensureValidAttrOrIdName(attrNameOne);
+        ensurePopKeyword(Keyword.AND, tokens); // AND
+        ensureMoreTokens(tokens, "expect attribute name tow for update"); // Attr two
+        String attrNameTwo = tokens.popFront();
+        ensureValidAttrOrIdName(attrNameTwo);
+        ensureNoMoreTokens(tokens); // End
+        return new Task.JoinTask(tableNameOne, tableNameTwo, attrNameOne, attrNameTwo);
+    }
+
     private static CompoundCondition parseCondition(TokenList tokens) throws GrammarException {
         ensureMoreTokens(tokens, "expect a condition");
         Condition condOne;
@@ -514,17 +570,18 @@ public class Grammar {
         if (str == null) {
             throw new DBException.NullObjectException("get tokens from null");
         }
-        final Keyword[] symbolKeywords = { // No GE and LE here
-                // The order here: EQ -> NEQ -> GT/LT
-                Keyword.STAR, Keyword.EQ, Keyword.NEQ, Keyword.GT, Keyword.LT,
+        final Keyword[] symbolKeywords = { // No EQ, NEQ, GE, LE here
+                Keyword.STAR, Keyword.ASSIGN, Keyword.GT, Keyword.LT,
                 Keyword.LBRACKET, Keyword.RBRACKET, Keyword.COMMA, Keyword.SEMICOLON
         };
         for (int i = 0; i < symbolKeywords.length; ++i) {
             String keywordStr = symbolKeywords[i].toString();
             str = str.replace(keywordStr, " " + keywordStr + " ");
         }
-        str = str.replace(" > =", " >= "); // GE
-        str = str.replace(" < =", " <= "); // LE
+        str = str.replace("! = ", " != "); // NEQ
+        str = str.replace(" >  = ", " >= "); // GE
+        str = str.replace(" <  = ", " <= "); // LE
+        str = str.replace(" =  = ", " == "); // EQ, lastly
         str = str.trim();
         if (str.length() == 0) {
             return new ArrayList<String>();
@@ -608,7 +665,7 @@ public class Grammar {
     }
 
     public static boolean isIdAttrName(String str) {
-        return str != null && getIdAttrName().equals(str.toLowerCase());
+        return str != null && getIdAttrName().toLowerCase().equals(str.toLowerCase());
     }
 
     public static boolean isValidNameString(String str) {
