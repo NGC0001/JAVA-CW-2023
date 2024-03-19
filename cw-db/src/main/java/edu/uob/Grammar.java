@@ -146,6 +146,7 @@ public class Grammar {
     public static class AlwaysTrueCondition implements Condition {
         public AlwaysTrueCondition() {
         }
+
         public boolean evaluate(ValueMapper valueMapper) {
             return true;
         }
@@ -200,7 +201,8 @@ public class Grammar {
 
         public boolean evaluate(ValueMapper valueMapper) throws DBException {
             if (valueMapper == null || this.cmpOp == null) {
-                throw new DBException.NullObjectException("null arguments in condition evaluation");
+                throw new DBException.NullObjectException(
+                        "null arguments in condition evaluation");
             }
             String value = valueMapper.getValueByKey(this.key);
             if (value == null || this.targetValue == null) {
@@ -214,17 +216,25 @@ public class Grammar {
             return arithmeticCompare(value, this.targetValue, this.cmpOp);
         }
 
-        private static boolean arithmeticCompare(String value, String targetValue, Keyword op) {
+        private static boolean arithmeticCompare(String value, String targetValue, Keyword op)
+                throws DBException {
             double diff = arithmeticDiff(value, targetValue);
             switch (op) {
-                case EQ: return diff == 0.0;
-                case GT: return diff > 0.0;
-                case LT: return diff < 0.0;
-                case GE: return diff >= 0.0;
-                case LE: return diff <= 0.0;
-                case NEQ: return diff != 0.0;
+                case EQ:
+                    return diff == 0.0;
+                case GT:
+                    return diff > 0.0;
+                case LT:
+                    return diff < 0.0;
+                case GE:
+                    return diff >= 0.0;
+                case LE:
+                    return diff <= 0.0;
+                case NEQ:
+                    return diff != 0.0;
+                default:
+                    throw new GrammarException("invalid operator " + op.toString());
             }
-            return false;
         }
     }
 
@@ -235,7 +245,7 @@ public class Grammar {
         try { // Both integer
             long valueLong = Long.valueOf(value);
             long targetValueLong = Long.valueOf(targetValue);
-            return (double)(valueLong - targetValueLong); // long -> double
+            return (double) (valueLong - targetValueLong); // long -> double
         } catch (Exception notLong) {
         }
         try { // One double, the other double or integer
@@ -250,7 +260,7 @@ public class Grammar {
         }
         String valueStr = stripSingleQuote(value);
         String targetValueStr = stripSingleQuote(targetValue);
-        return (double)(valueStr.compareTo(targetValueStr)); // int -> double
+        return (double) (valueStr.compareTo(targetValueStr)); // int -> double
     }
 
     private static String stripSingleQuote(String str) {
@@ -278,21 +288,30 @@ public class Grammar {
         return parseCommandType(cmdType, tokens);
     }
 
-    private static Task parseCommandType(Keyword cmdType, TokenList tokens) throws GrammarException {
+    private static Task parseCommandType(Keyword cmdType, TokenList tokens)
+            throws GrammarException {
         switch (cmdType) {
             case USE:
                 return parseUse(tokens);
             case CREATE:
                 return parseCreate(tokens);
-            case DROP: return parseDrop(tokens);
-            case ALTER: return parseAlter(tokens);
-            case INSERT: return parseInsert(tokens);
-            case SELECT: return parseSelect(tokens);
-            case UPDATE: return parseUpdate(tokens);
-            case DELETE: return parseDelete(tokens);
-            case JOIN: return parseJoin(tokens);
+            case DROP:
+                return parseDrop(tokens);
+            case ALTER:
+                return parseAlter(tokens);
+            case INSERT:
+                return parseInsert(tokens);
+            case SELECT:
+                return parseSelect(tokens);
+            case UPDATE:
+                return parseUpdate(tokens);
+            case DELETE:
+                return parseDelete(tokens);
+            case JOIN:
+                return parseJoin(tokens);
+            default:
+                throw new GrammarException("unknown command type " + cmdType.toString());
         }
-        throw new GrammarException("unknown command type " + cmdType.toString());
     }
 
     private static Task parseUse(TokenList tokens) throws GrammarException {
@@ -422,10 +441,10 @@ public class Grammar {
             tokens.popFront();
         } else {
             selection = parseList(tokens, (tokenList) -> {
-                    ensureMoreTokens(tokenList, "incomplete selection list");
-                    String attrName = tokenList.popFront();
-                    ensureValidAttrOrIdName(attrName);
-                    return attrName;
+                ensureMoreTokens(tokenList, "incomplete selection list");
+                String attrName = tokenList.popFront();
+                ensureValidAttrOrIdName(attrName);
+                return attrName;
             });
         }
         ensurePopKeyword(Keyword.FROM, tokens);
@@ -448,15 +467,15 @@ public class Grammar {
         ensureValidTableName(tableName);
         ensurePopKeyword(Keyword.SET, tokens);
         List<Map.Entry<String, String>> modification = parseList(tokens, (tokenList) -> {
-                if (tokenList.size() < 3) {
-                    throw new GrammarException("empty or incomplete name-value pair");
-                }
-                String attrName = tokenList.popFront();
-                ensureValidAttributeName(attrName);
-                ensurePopKeyword(Keyword.ASSIGN, tokens);
-                String attrValue = tokenList.popFront();
-                ensureValidAttributeValue(attrValue);
-                return new AbstractMap.SimpleEntry<String, String>(attrName, attrValue);
+            if (tokenList.size() < 3) {
+                throw new GrammarException("empty or incomplete name-value pair");
+            }
+            String attrName = tokenList.popFront();
+            ensureValidAttributeName(attrName);
+            ensurePopKeyword(Keyword.ASSIGN, tokens);
+            String attrValue = tokenList.popFront();
+            ensureValidAttributeValue(attrValue);
+            return new AbstractMap.SimpleEntry<String, String>(attrName, attrValue);
         });
         ensurePopKeyword(Keyword.WHERE, tokens);
         Condition cond = parseCondition(tokens);
@@ -510,11 +529,12 @@ public class Grammar {
             return cond;
         }
         Keyword connection = Keyword.getByString(tokens.front());
-        if (connection == Keyword.AND || connection == Keyword.OR) {
-            tokens.popFront();
-            Condition condTwo = parseCondition(tokens);
-            cond.setNextCond(connection == Keyword.AND, condTwo);
+        if (connection != Keyword.AND && connection != Keyword.OR) {
+            return cond;
         }
+        tokens.popFront();
+        Condition condTwo = parseCondition(tokens);
+        cond.setNextCond(connection == Keyword.AND, condTwo);
         return cond;
     }
 
@@ -529,13 +549,20 @@ public class Grammar {
         if (cmpOp == null) {
             throw new GrammarException("invalid comparison op " + cmpOpStr);
         }
+        switch (cmpOp) {
+            case EQ: case GT: case LT: case GE: case LE: case NEQ:
+                break;
+            default:
+                throw new GrammarException("illegal operator " + cmpOp.toString());
+        }
         String value = tokens.popFront();
         ensureValidAttributeValue(value);
         Comparator cmp = new Comparator(attrName, cmpOp, value);
         return cmp;
     }
 
-    private static <E> List<E> parseList(TokenList tokens, ElementExtractor<E> extractor) throws GrammarException {
+    private static <E> List<E> parseList(TokenList tokens, ElementExtractor<E> extractor)
+            throws GrammarException {
         ArrayList<E> list = new ArrayList<E>();
         E e = extractor.extract(tokens);
         list.add(e);
@@ -606,10 +633,10 @@ public class Grammar {
     }
 
     public static boolean isCharLiteral(char ch) {
-      if (ch > 256) {
-        return false;
-      }
-      return ch == ' ' || Character.isLetterOrDigit(ch) || isSymbol(ch);
+        if (ch > 256) {
+            return false;
+        }
+        return ch == ' ' || Character.isLetterOrDigit(ch) || isSymbol(ch);
     }
 
     // String literal includes "'"
@@ -619,12 +646,12 @@ public class Grammar {
         }
         int strLen = str.length();
         if (strLen < 2 || str.charAt(0) != '\'' || str.charAt(strLen - 1) != '\'') {
-          return false;
+            return false;
         }
         for (int i = 1; i < strLen - 1; ++i) {
-          if (!isCharLiteral(str.charAt(i))) {
-            return false;
-          }
+            if (!isCharLiteral(str.charAt(i))) {
+                return false;
+            }
         }
         return true;
     }
@@ -692,7 +719,7 @@ public class Grammar {
 
     public static boolean isValidAttributeValue(String str) {
         return isStringLiteral(str) || isBooleanLiteral(str)
-          || isFloatLiteral(str) || isIntegerLiteral(str) || isNullLiteral(str);
+                || isFloatLiteral(str) || isIntegerLiteral(str) || isNullLiteral(str);
     }
 
     private static void ensureValidDatabaseName(String databaseName) throws GrammarException {

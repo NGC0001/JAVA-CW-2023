@@ -198,11 +198,13 @@ public class Table {
 
         public int getIndexOf(String attrName) throws DBException {
             if (attrName == null) {
-                throw new DBException.NullObjectException("mapping from null attribute name");
+                throw new DBException.NullObjectException(
+                        "mapping from null attribute name");
             }
             Integer idx = mapper.get(attrName.toLowerCase());
             if (idx == null) {
-                throw new TableException.InvalidAttributeNameException(attrName, "no mapping");
+                throw new TableException.InvalidAttributeNameException(
+                        attrName, "no mapping");
             }
             return idx.intValue();
         }
@@ -263,7 +265,8 @@ public class Table {
                 String attrName = entry.getKey();
                 int attrIdx = idxMapper.getIndexOf(attrName);
                 if (attrIdx == Entity.idIdx) {
-                    throw new TableException.InvalidAttributeNameException(attrName, "cannot modify id");
+                    throw new TableException.InvalidAttributeNameException(
+                            attrName, "cannot modify id");
                 }
                 String attrValue = entry.getValue();
                 if (!Grammar.isValidAttributeValue(attrValue)) {
@@ -271,7 +274,8 @@ public class Table {
                 }
                 String prevModification = modifiedValues.put(attrIdx, attrValue);
                 if (prevModification != null) {
-                    throw new TableException.InvalidAttributeNameException(attrName, "modified twice");
+                    throw new TableException.InvalidAttributeNameException(
+                            attrName, "modified twice");
                 }
             }
         }
@@ -509,11 +513,13 @@ public class Table {
         return new AttrIdFieldIndexMapper();
     }
 
-    public AttrIdFieldGetter getAttrIdFieldGetter(List<String> selectedAttrNames) throws DBException {
+    public AttrIdFieldGetter getAttrIdFieldGetter(List<String> selectedAttrNames)
+            throws DBException {
         return new AttrIdFieldGetter(selectedAttrNames);
     }
 
-    public AttrFieldSetter getAttrFieldSetter(List<Map.Entry<String, String>> modification) throws DBException {
+    public AttrFieldSetter getAttrFieldSetter(List<Map.Entry<String, String>> modification)
+            throws DBException {
         return new AttrFieldSetter(modification);
     }
 

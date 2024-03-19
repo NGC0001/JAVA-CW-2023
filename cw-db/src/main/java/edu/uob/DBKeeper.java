@@ -1,7 +1,6 @@
 package edu.uob;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -251,14 +250,17 @@ public class DBKeeper {
         String tableNameOne = task.getTableNameOne();
         String tableNameTwo = task.getTableNameTwo();
         if (tableNameOne.toLowerCase().equals(tableNameTwo.toLowerCase())) {
-            throw new DBException.InvalidTableNameException(tableNameTwo, "need another table");
+            throw new DBException.InvalidTableNameException(
+                    tableNameTwo, "need another table");
         }
         Table tableOne = getCurrentDatabase().getTable(tableNameOne);
         Table tableTwo = getCurrentDatabase().getTable(tableNameTwo);
         String attrOne = task.getAttrNameOne();
         String attrTwo = task.getAttrNameTwo();
-        int idxOne = Grammar.isIdAttrName(attrOne) ? Table.Entity.idIdx : tableOne.getAttrIdx(attrOne);
-        int idxTwo = Grammar.isIdAttrName(attrTwo) ? Table.Entity.idIdx : tableTwo.getAttrIdx(attrTwo);
+        int idxOne = Grammar.isIdAttrName(attrOne) ? Table.Entity.idIdx
+                : tableOne.getAttrIdx(attrOne);
+        int idxTwo = Grammar.isIdAttrName(attrTwo) ? Table.Entity.idIdx
+                : tableTwo.getAttrIdx(attrTwo);
         Result result = new Result();
         List<String> header = new ArrayList<String>();
         header.add(Grammar.getIdAttrName());
@@ -273,7 +275,8 @@ public class DBKeeper {
         return result;
     }
 
-    private void joinTables(Table t1, Table t2, int idx1, int idx2, Result result) throws DBException {
+    private void joinTables(Table t1, Table t2, int idx1, int idx2, Result result)
+            throws DBException {
         int nextId = 0;
         for (Table.Entity e1 : t1.getEntities()) {
             for (Table.Entity e2 : t2.getEntities()) {

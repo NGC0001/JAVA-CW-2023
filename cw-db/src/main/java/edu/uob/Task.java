@@ -1,6 +1,5 @@
 package edu.uob;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -165,7 +164,8 @@ public abstract class Task {
         private String tableName;
         private Condition condition;
 
-        public UpdateTask(String tableName, List<Map.Entry<String, String>> modification, Condition condition) {
+        public UpdateTask(String tableName, List<Map.Entry<String, String>> modification,
+                Condition condition) {
             super();
             this.modification = modification;
             this.tableName = tableName;
@@ -210,7 +210,8 @@ public abstract class Task {
         private String attrNameOne;
         private String attrNameTwo;
 
-        public JoinTask(String tableNameOne, String tableNameTwo, String attrNameOne, String attrNameTwo) {
+        public JoinTask(String tableNameOne, String tableNameTwo, String attrNameOne,
+                String attrNameTwo) {
             super();
             this.tableNameOne = tableNameOne;
             this.tableNameTwo = tableNameTwo;
