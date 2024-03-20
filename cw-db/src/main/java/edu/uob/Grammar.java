@@ -550,7 +550,13 @@ public class Grammar {
             throw new GrammarException("invalid comparison op " + cmpOpStr);
         }
         switch (cmpOp) {
-            case EQ: case GT: case LT: case GE: case LE: case NEQ: case LIKE:
+            case EQ:
+            case GT:
+            case LT:
+            case GE:
+            case LE:
+            case NEQ:
+            case LIKE:
                 break;
             default:
                 throw new GrammarException("illegal operator " + cmpOp.toString());

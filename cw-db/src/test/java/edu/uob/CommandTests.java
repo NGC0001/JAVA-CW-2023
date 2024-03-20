@@ -19,16 +19,17 @@ public class CommandTests {
     // Random name generator
     private String generateRandomName() {
         String randomName = "";
-        for(int i = 0; i < 10; ++i) {
-            randomName += (char)(97 + 25.0 * Math.random());
+        for (int i = 0; i < 10; ++i) {
+            randomName += (char) (97 + 25.0 * Math.random());
         }
         return randomName;
     }
 
     private String sendCommandToServer(String command) {
-        // Try to send a command to the server - this call will timeout if it takes too long
+        // Try to send a command to the server - this call will timeout if it takes too
+        // long
         return assertTimeoutPreemptively(Duration.ofMillis(500),
-            () -> server.handleCommand(command), "server took too long to respond");
+                () -> server.handleCommand(command), "server took too long to respond");
     }
 
     private void assertOk(String response) {
@@ -39,6 +40,10 @@ public class CommandTests {
     private void assertError(String response) {
         assertTrue(response.startsWith("[ERROR]"), "expect ERROR");
         assertFalse(response.contains("[OK]"), "expect no OK");
+    }
+
+    private void assertOkHasNoRow(String response, String... row) {
+        assertTrue(findFromOkResponse(response, row).size() == 0);
     }
 
     private void assertOkHasRow(String response, String... row) {
@@ -127,6 +132,7 @@ public class CommandTests {
         assertError(sendCommandToServer("create database newdb4 newdb5;"));
         assertError(sendCommandToServer("create database newdb4, newdb5;"));
         assertOk(sendCommandToServer("create database newdb4;"));
+        assertOk(sendCommandToServer("create database 0;"));
     }
 
     @Test
@@ -149,6 +155,7 @@ public class CommandTests {
         assertOk(sendCommandToServer("use newdb;"));
         assertOk(sendCommandToServer("create table \tt1\t;"));
         assertOk(sendCommandToServer("create table t2;"));
+        assertOk(sendCommandToServer("create table 001;"));
         assertError(sendCommandToServer("create table T1;"));
         assertError(sendCommandToServer("create table t3;;"));
         assertError(sendCommandToServer("create table t5 t6;"));
@@ -203,7 +210,12 @@ public class CommandTests {
         assertOk(sendCommandToServer("insert into t2 values (false, 'or', '');"));
         assertOk(sendCommandToServer("insert into t2 values (-3, -2.3, nULL);"));
         assertOk(sendCommandToServer("insert into t2 values (+3, +2.3, ' ');"));
-        assertOk(sendCommandToServer("insert into t2 values ('-3.0, 2(', 'false', '  {)}');"));
+        assertOk(sendCommandToServer(
+                "insert into t2 values ('-3.0, 2(', 'false', '  {)}');"));
+        assertOk(sendCommandToServer("insert into t2 values ('', '', '');"));
+        assertError(sendCommandToServer("insert into t2 values ('£', '', '');"));
+        assertError(sendCommandToServer("insert into t2 values ('÷', '', '');"));
+        assertError(sendCommandToServer("insert into t2 values ('好', '', '');"));
         assertError(sendCommandToServer("insert into t2 values (1, 2, 3) (1, 2, 3);"));
         assertError(sendCommandToServer("insert into t2 values (1, 2, 3), (1, 2, 3);"));
         assertError(sendCommandToServer("insert into t2 values (1, 2, or);"));
@@ -296,11 +308,12 @@ public class CommandTests {
         assertOkHeaderRow(response, "id", "a2");
         assertOkUniqueRow(response, "0", "2");
         assertOk(sendCommandToServer("alter table t add a3;"));
-        response = sendCommandToServer("select * from t;");
-        assertOkHeaderRow(response, "id", "a2", "a3");
-        assertOkUniqueRow(response, "0", "2", "null");
+        response = sendCommandToServer("select a3,a3,id,a2 from t;");
+        assertOkHeaderRow(response, "a3", "a3", "id", "a2");
+        assertOkUniqueRow(response, "null", "null", "0", "2");
         assertOk(sendCommandToServer("insert into t values ('A1B2', +2.0);"));
-        assertOkUniqueRow(sendCommandToServer("select * from t;"), "1", "'A1B2'", "+2.0");
+        assertOkUniqueRow(
+                sendCommandToServer("select * from t;"), "1", "'A1B2'", "+2.0");
         assertError(sendCommandToServer("select * from t where;"));
         assertError(sendCommandToServer("select * from t where true;"));
         assertError(sendCommandToServer("select * from t where ();"));
@@ -316,11 +329,12 @@ public class CommandTests {
         assertError(sendCommandToServer("select * from t where (id == 0) and;"));
         assertError(sendCommandToServer("select * from t where (id == 0) and true;"));
         assertError(sendCommandToServer("select * from t where id == 0 and ();"));
-        assertOkCountDataRows(sendCommandToServer("select * from t where (id == 0 and ((a3 == +2.0)));"), 0);
-        assertOkCountDataRows(
-              sendCommandToServer("select * from t where (id == 0 and ((a3 == +2.0))) or id == 1;"), 1);
-        assertOkCountDataRows(
-              sendCommandToServer("select * from t where id == 0 and (((a3 == +2.0)) or id == 1);"), 0);
+        assertOkCountDataRows(sendCommandToServer(
+                "select * from t where (id == 0 and ((a3 == +2.0)));"), 0);
+        assertOkCountDataRows(sendCommandToServer(
+                "select * from t where (id == 0 and ((a3 == +2.0))) or id == 1;"), 1);
+        assertOkCountDataRows(sendCommandToServer(
+                "select * from t where id == 0 and (((a3 == +2.0)) or id == 1);"), 0);
         assertOk(sendCommandToServer("alter table t drop a2;"));
         assertOk(sendCommandToServer("alter table t drop a3;"));
         response = sendCommandToServer("select * from t;");
@@ -336,9 +350,8 @@ public class CommandTests {
         assertOk(sendCommandToServer("create database db;"));
         assertError(sendCommandToServer("delete from t where id == 0;"));
         assertOk(sendCommandToServer("use db;"));
-        assertOk(sendCommandToServer("create table t;"));
+        assertOk(sendCommandToServer("create table t (1a);"));
         assertOk(sendCommandToServer("\ndeLetE\tfrom T wHere id== 0;"));
-        assertOk(sendCommandToServer("alter table t add 1a;"));
         assertOk(sendCommandToServer("alter table t add 2b;"));
         assertOk(sendCommandToServer("insert into t values (2.0, 'hello World');"));
         assertError(sendCommandToServer("deLete from t where id== 0 and a1 >3.0;"));
@@ -355,16 +368,126 @@ public class CommandTests {
         assertOk(sendCommandToServer("delete from t where id != 0 and 2b lIKe 'hello';"));
         response = sendCommandToServer("select * from t;");
         assertOkCountDataRows(response, 2);
-        assertOk(sendCommandToServer("delete from t where 1a <= 100.0 and 2b like 'hello';"));
+        assertOk(sendCommandToServer(
+                "delete from t where 1a <= 100.0 and 2b like 'hello';"));
         response = sendCommandToServer("select * from t;");
         assertOkCountDataRows(response, 1);
-        assertOk(sendCommandToServer("delete from t where 1a <= 100.0 and 2b like 'hello';"));
+        assertOk(sendCommandToServer(
+                "delete from t where 1a <= 100.0 and 2b like 'hello';"));
         response = sendCommandToServer("select * from t;");
         assertOkCountDataRows(response, 1);
         assertOkHasRow(response, "1", "20.1", "'See you later'");
+        assertOkHasNoRow(response, "1", "20.1", "'see you later'");
+        assertOkHasNoRow(response, "0", "2.0", "'hello World'");
+    }
+
+    @Test
+    public void testUpdateCommand() {
+        String response;
+        assertOk(sendCommandToServer("create database db;"));
+        assertError(sendCommandToServer("update t set a='AA', b='BB' where id == 0;"));
+        assertOk(sendCommandToServer("use db;"));
+        assertOk(sendCommandToServer("create table t (a, b);"));
+        assertOk(sendCommandToServer("insert into t values ('A', 'B');"));
+        assertError(sendCommandToServer("update t set a='AA', b='BB' where a like 'A';;"));
+        assertError(sendCommandToServer("update t set a=b where a like 'A';;"));
+        assertError(sendCommandToServer("update t set a=AA, b='BB' where a like 'A';"));
+        assertError(sendCommandToServer("update t set a=OR, b='BB' where a like 'A';"));
+        assertError(sendCommandToServer("update t set a=='AA', b='BB' where a like 'A';"));
+        assertError(sendCommandToServer("update t set a='AA', b='BB', where a like 'A';"));
+        assertError(sendCommandToServer("update t set id=0 where id != 0;"));
+        assertOk(sendCommandToServer("upDAte t set a='AA'\n,B='BB' wheRe iD != 0;"));
+        response = sendCommandToServer("select * from t;");
+        assertOkHasRow(response, "0", "'A'", "'B'");
+        assertOkHasNoRow(response, "0", "'AA'", "'BB'");
+        assertOk(sendCommandToServer("update t set a='AA', b='BB' where a like 'A';"));
+        assertOkHasRow(sendCommandToServer("select * from t;"), "0", "'AA'", "'BB'");
+        assertOk(sendCommandToServer("update t set a='AAA', b='BBB' where A like 'A';"));
+        assertOkHasRow(
+                sendCommandToServer("select * from t;"), "0", "'AAA'", "'BBB'");
+        assertOk(sendCommandToServer("update t set a='AAAA', b='BBBB' where A like 'B';"));
+        assertOkHasRow(
+                sendCommandToServer("select * from t;"), "0", "'AAA'", "'BBB'");
+        assertOk(sendCommandToServer("insert into t values ('YES', 'NO');"));
+        assertOk(sendCommandToServer("insert into t values (20, NULL);"));
+        assertOk(sendCommandToServer(
+                "update t set a=True where (id >= 1) and (a like '');"));
+        response = sendCommandToServer("select * from t;");
+        assertOkCountDataRows(response, 3);
+        assertOkHasRow(response, "0", "'AAA'", "'BBB'");
+        assertOkHasRow(response, "1", "true", "'NO'");
+        assertOkHasRow(response, "2", "true", "null");
+    }
+
+    @Test
+    public void testJoinCommand() {
+        String response;
+        assertOk(sendCommandToServer("create database db;"));
+        assertError(sendCommandToServer("join t1 and t2 on a1 and id;"));
+        assertOk(sendCommandToServer("use db;"));
+        assertOk(sendCommandToServer("create table t1 (a1, b1);"));
+        assertOk(sendCommandToServer("create table t2 (a2, b2, c2);"));
+        assertOk(sendCommandToServer("insert into t1 values (1, 100);"));
+        assertOk(sendCommandToServer("insert into t1 values (1, 101);"));
+        assertOk(sendCommandToServer("insert into t2 values (2, 20, 0);"));
+        assertOk(sendCommandToServer("insert into t2 values (2, 21, 1);"));
+        assertError(sendCommandToServer("join t1 and t2 on a1 and id;;"));
+        assertError(sendCommandToServer("join t1 and t2 on a1 and id and id;"));
+        assertError(sendCommandToServer("join t1 and t1 on a1 and id;"));
+        assertError(sendCommandToServer("join t1 and t2 on a1,id;"));
+        assertError(sendCommandToServer("join t1, t2 on a1 and id;"));
+        response = sendCommandToServer("\tJoin t2 anD T1 On id\tand a1;");
+        assertOkHeaderRow(response, "id", "t2.a2", "t2.b2", "t2.c2", "t1.a1", "t1.b1");
+        assertOkCountDataRows(response, 2);
+        assertOkHasRow(response, "0", "2", "21", "1", "1", "100");
+        assertOkHasRow(response, "1", "2", "21", "1", "1", "101");
+        response = sendCommandToServer("join t1 and t2 on id and c2;");
+        assertOkHeaderRow(response, "id", "t1.a1", "t1.b1", "t2.a2", "t2.b2", "t2.c2");
+        assertOkCountDataRows(response, 2);
+        assertOkHasRow(response, "0", "1", "100", "2", "20", "0");
+        assertOkHasRow(response, "1", "1", "101", "2", "21", "1");
+        response = sendCommandToServer("join t1 and t2 on a1 and a2;");
+        assertOkHeaderRow(response, "id", "t1.a1", "t1.b1", "t2.a2", "t2.b2", "t2.c2");
+        assertOkCountDataRows(response, 0);
+    }
+
+    @Test
+    public void testPersistence() {
+        String response;
+        assertOk(sendCommandToServer("create database 1;"));
+        assertOk(sendCommandToServer("create database 2;"));
+        assertOk(sendCommandToServer("create database 3;"));
+        assertOk(sendCommandToServer("create database 4;"));
+        assertOk(sendCommandToServer("drop database 2;"));
+        assertOk(sendCommandToServer("use 3;"));
+        assertOk(sendCommandToServer("create table 1;"));
+        assertOk(sendCommandToServer("create table 2;"));
+        assertOk(sendCommandToServer("create table 3 (a, b, c);"));
+        assertOk(sendCommandToServer("create table 4;"));
+        assertOk(sendCommandToServer("drop table 2;"));
+        assertOk(sendCommandToServer("insert into 3 values (11, 12, 13);"));
+        assertOk(sendCommandToServer("insert into 3 values (21, 22, 23);"));
+        assertOk(sendCommandToServer("insert into 3 values (31, 32, 33);"));
+        assertOk(sendCommandToServer("alter table 3 drop b;"));
+        assertOk(sendCommandToServer("update 3 set a=0 where c<20;"));
+        assertOk(sendCommandToServer("delete from 3 where c>30;"));
+
+        this.server = new DBServer(this.dir);
+        assertError(sendCommandToServer("create database 1;"));
+        assertError(sendCommandToServer("drop database 2;"));
+        assertError(sendCommandToServer("create database 3;"));
+        assertError(sendCommandToServer("create database 4;"));
+        assertOk(sendCommandToServer("create database 2;"));
+        assertOk(sendCommandToServer("use 3;"));
+        assertError(sendCommandToServer("create table 1;"));
+        assertError(sendCommandToServer("drop table 2;"));
+        assertError(sendCommandToServer("create table 3;"));
+        assertError(sendCommandToServer("create table 4;"));
+        assertOk(sendCommandToServer("create table 2;"));
+        response = sendCommandToServer("select * from 3;");
+        assertOkHeaderRow(response, "id", "a", "c");
+        assertOkCountDataRows(response, 2);
+        assertOkHasRow(response, "0", "0", "13");
+        assertOkHasRow(response, "1", "21", "23");
     }
 }
-
-// <Update>
-// <Join>
-// Persistence
