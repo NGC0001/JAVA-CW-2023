@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+// This class checks/parses user input.
 public class Grammar {
+    // Grammar specific exceptions.
     public static class GrammarException extends DBException {
         @Serial
         private static final long serialVersionUID = 1;
@@ -96,7 +98,9 @@ public class Grammar {
         }
     }
 
-    // Does not throw DBException.
+    // This class stores the tokens lexed from user input string.
+    // When parsing, it serves as a token provider.
+    // This class does not throw DBException.
     // Only a thin layer around List<String> to avoid dynamic modification.
     private static class TokenList {
         private List<String> tokens;
@@ -138,11 +142,15 @@ public class Grammar {
         }
     }
 
+    // Lambda interface for parseList method.
+    // Parse an element of a list from TokenList.
     @FunctionalInterface
     private static interface ElementExtractor<E> {
         E extract(TokenList tokens) throws GrammarException;
     }
 
+    // When a user input specifies no condition,
+    // this class is used by default.
     public static class AlwaysTrueCondition implements Condition {
         public AlwaysTrueCondition() {
         }
@@ -152,6 +160,12 @@ public class Grammar {
         }
     }
 
+    // This class represents "Condition1 [AND/OR Condition2]",
+    // where Condition1/Condition2 can be CompoundCondition or Comparator.
+    // So CompoundCondition is in fact a tree-ish data structure.
+    //
+    // For all user commands with condition part,
+    // the condition part will be parsed into a CompoundCondition.
     public static class CompoundCondition implements Condition {
         private Condition condOne;
         private boolean connectByAnd;
@@ -188,6 +202,7 @@ public class Grammar {
         }
     }
 
+    // This class represents the basic comparison "attributeName op targetValue"
     public static class Comparator implements Condition {
         private String key;
         private Keyword cmpOp;
@@ -241,16 +256,25 @@ public class Grammar {
     private static final String idAttrName = "id";
     private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
 
+    // Try do arithmetic comparison between two given strings.
     public static double arithmeticDiff(String value, String targetValue) {
-        try { // Both integer
+        if (value == null) {
+            value = "";
+        }
+        if (targetValue == null) {
+            targetValue = "";
+        }
+        try {
             long valueLong = Long.valueOf(value);
             long targetValueLong = Long.valueOf(targetValue);
+            // Both integer
             return (double) (valueLong - targetValueLong); // long -> double
         } catch (Exception notLong) {
         }
-        try { // One double, the other double or integer
+        try {
             double valueDouble = Double.valueOf(value);
             double targetValueDouble = Double.valueOf(targetValue);
+            // One double, the other double or integer
             return valueDouble - targetValueDouble;
         } catch (Exception notDouble) {
         }
@@ -567,6 +591,8 @@ public class Grammar {
         return cmp;
     }
 
+    // Parse a comma-separated list: `e, e, e, ..., e`
+    // Each `e` is parsed by `extractor`.
     private static <E> List<E> parseList(TokenList tokens, ElementExtractor<E> extractor)
             throws GrammarException {
         ArrayList<E> list = new ArrayList<E>();
@@ -580,6 +606,7 @@ public class Grammar {
         return list;
     }
 
+    // This class lexes a string into token list.
     public static ArrayList<String> getTokensFromString(String str) throws DBException {
         if (str == null) {
             throw new DBException.NullObjectException("get tokens from null");

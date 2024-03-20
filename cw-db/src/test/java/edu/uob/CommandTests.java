@@ -388,6 +388,7 @@ public class CommandTests {
         assertError(sendCommandToServer("update t set a='AA', b='BB' where id == 0;"));
         assertOk(sendCommandToServer("use db;"));
         assertOk(sendCommandToServer("create table t (a, b);"));
+        assertOk(sendCommandToServer("update t set a='aa' where id == 0;"));
         assertOk(sendCommandToServer("insert into t values ('A', 'B');"));
         assertError(sendCommandToServer("update t set a='AA', b='BB' where a like 'A';;"));
         assertError(sendCommandToServer("update t set a=b where a like 'A';;"));
@@ -396,6 +397,8 @@ public class CommandTests {
         assertError(sendCommandToServer("update t set a=='AA', b='BB' where a like 'A';"));
         assertError(sendCommandToServer("update t set a='AA', b='BB', where a like 'A';"));
         assertError(sendCommandToServer("update t set id=0 where id != 0;"));
+        assertError(sendCommandToServer("update t set a='aa', a='aa' where id != 0;"));
+        assertError(sendCommandToServer("update t set a='aa', a='bb' where id != 0;"));
         assertOk(sendCommandToServer("upDAte t set a='AA'\n,B='BB' wheRe iD != 0;"));
         response = sendCommandToServer("select * from t;");
         assertOkHasRow(response, "0", "'A'", "'B'");

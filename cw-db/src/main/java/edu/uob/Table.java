@@ -18,10 +18,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// This class represents a talbe of a database.
+// This class represents a table.
 // Some error checkings are done twice:
-// in parsing by Grammar class, and here by Table class.
+//   when parsing user input by Grammar class, and here by Table class.
 public class Table {
+    // Table specific exceptions.
     public static class TableException extends DBException {
         @Serial
         private static final long serialVersionUID = 1;
@@ -98,7 +99,10 @@ public class Table {
         }
     }
 
+    // Represent a row in a table
     public static class Entity {
+        // Id is not treated as an attribute.
+        // But here id is given a special attribute index, just for convenience.
         public static final int idIdx = -99;
 
         private final long id;
@@ -182,8 +186,9 @@ public class Table {
         }
     }
 
-    // Get the index of an attribute, return Entity.idIdx for "id"
-    // Invalid after table changed
+    // Get the index (i.e., column) of an attribute.
+    // It returns Entity.idIdx for "id".
+    // Invalid after table altered.
     public class AttrIdFieldIndexMapper {
         private HashMap<String, Integer> mapper;
 
@@ -210,8 +215,8 @@ public class Table {
         }
     }
 
-    // Get selected attributes/id of an entity
-    // Invalid after table changed
+    // Get selected attributes/id of an entity.
+    // Invalid after table altered.
     public class AttrIdFieldGetter {
         private List<String> selectedAttr;
         private List<Integer> selectedIdx;
@@ -250,8 +255,8 @@ public class Table {
         }
     }
 
-    // Set selected attributes of an entity
-    // Invalid after table changed
+    // Set selected attributes of an entity.
+    // Invalid after table altered.
     public class AttrFieldSetter {
         private HashMap<Integer, String> modifiedValues;
 
@@ -311,6 +316,8 @@ public class Table {
         this.entities = new ArrayList<Entity>();
     }
 
+    // Create table from meta string.
+    // A meta string describes all the attributes and next available id.
     public static Table createFromMetaString(String meta) throws DBException {
         if (meta == null) {
             throw new DBException.NullObjectException("creating table from null meta");
@@ -335,6 +342,7 @@ public class Table {
         return table;
     }
 
+    // Load table entities from file
     public void loadFromFile(File file) throws DBException, IOException {
         if (file == null) {
             throw new DBException.NullObjectException("null file for loading table");
@@ -360,6 +368,7 @@ public class Table {
         }
     }
 
+    // Store table entities to file
     public String storeToFile(Path tableFilePath) throws DBException, IOException {
         Files.write(tableFilePath, exportToString("\t").getBytes(), StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE,
@@ -478,6 +487,7 @@ public class Table {
         this.nextId++;
     }
 
+    // This method is helpful when loading entities from file
     public void addEntityFromString(String str) throws DBException {
         if (str == null) {
             throw new DBException.NullObjectException("null string for adding entity");
@@ -523,6 +533,7 @@ public class Table {
         return new AttrFieldSetter(modification);
     }
 
+    // Returns all the entities that fulfill given condition
     public List<Entity> chooseEntities(Condition cond) throws DBException {
         AttrIdFieldIndexMapper idxMapper = getAttrIdFieldIndexMapper();
         List<Entity> chosenEntities = new ArrayList<Entity>();
@@ -538,6 +549,7 @@ public class Table {
         return chosenEntities;
     }
 
+    // Delete all the entities that fulfill given condition
     public boolean deleteEntities(Condition cond) throws DBException {
         List<Entity> leftEntities = chooseEntities(Condition.negate(cond));
         if (leftEntities.size() == getNumberOfEntities()) {

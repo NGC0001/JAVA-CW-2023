@@ -24,6 +24,8 @@ public class Database {
         this.tables = new HashMap<String, Table>();
     }
 
+    // Load this database from directory according to the meta string.
+    // Meta string describes all the tables inside this database.
     public void loadByMetaString(String meta, Path dataDir, String tableFileNamePrefix)
             throws DBException, IOException {
         if (meta == null) {
@@ -71,6 +73,9 @@ public class Database {
         addTable(tableName, table);
     }
 
+    // Save the database to directory.
+    // Each table is saved into a separate file.
+    // Return the meta string of this database.
     public String storeToDirectory(Path dataDir, String tableFileNamePrefix)
             throws DBException, IOException {
         if (dataDir == null || tableFileNamePrefix == null) {
@@ -95,6 +100,7 @@ public class Database {
         return meta;
     }
 
+    // Calculate the filename for loading/storing a given table.
     public String getFilePathForTable(String fileNamePrefix, String tableName, Table table)
             throws DBException {
         if (tableName == null || table == null) {

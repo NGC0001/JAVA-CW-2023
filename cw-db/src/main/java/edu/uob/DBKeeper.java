@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 // This class represents a collection of databases.
-// It is also an executor of user commands.
+// It is also the executor of user commands.
 public class DBKeeper {
     private static final String databasesMetaFileName = "databases.meta";
     private static final char metaFormatBracketLeft = '{';
@@ -23,7 +23,7 @@ public class DBKeeper {
 
     private HashMap<String, Database> databases;
     private Database currentDb;
-    private boolean updatedByTask;
+    private boolean updatedByTask; // Whether databases changed by user command
 
     public DBKeeper() {
         this.databases = new HashMap<String, Database>();
@@ -31,7 +31,8 @@ public class DBKeeper {
         this.updatedByTask = false;
     }
 
-    // Paths.get/Path.toFile/File.isFile also throws RuntimeException
+    // Load all the databases from given directory.
+    // Paths.get/Path.toFile/File.isFile also throws RuntimeException.
     public void loadFromDirectory(String directoryPath) throws DBException, IOException {
         if (directoryPath == null) {
             throw new DBException.NullObjectException(
@@ -45,8 +46,10 @@ public class DBKeeper {
         loadByMetaFile(metaFilePath);
     }
 
-    // Files.readAllBytes also throws Error
-    // Files.readAllBytes also throws RuntimeException
+    // A meta file contains a meta string.
+    // A meta string describes all existing databases.
+    // Files.readAllBytes also throws Error.
+    // Files.readAllBytes also throws RuntimeException.
     public void loadByMetaFile(Path metaFilePath) throws DBException, IOException {
         if (metaFilePath == null) {
             throw new DBException.NullObjectException(
@@ -224,12 +227,12 @@ public class DBKeeper {
     private Result executeUpdate(Task.UpdateTask task) throws DBException {
         // Better to implement inside Table class
         Table table = getCurrentDatabase().getTable(task.getTableName());
+        Table.AttrFieldSetter attrSetter = table.getAttrFieldSetter(task.getModification());
         List<Table.Entity> chosenEntities = table.chooseEntities(task.getCondition());
         Result result = new Result();
         if (chosenEntities.isEmpty()) {
             return result;
         }
-        Table.AttrFieldSetter attrSetter = table.getAttrFieldSetter(task.getModification());
         setUpdatedByTask();
         for (Table.Entity entity : chosenEntities) {
             attrSetter.setSelectedAttrValues(entity); // Shall not throw here
@@ -278,6 +281,7 @@ public class DBKeeper {
     private void joinTables(Table t1, Table t2, int idx1, int idx2, Result result)
             throws DBException {
         int nextId = 0;
+        // O(n^2) time complexity
         for (Table.Entity e1 : t1.getEntities()) {
             for (Table.Entity e2 : t2.getEntities()) {
                 String v1 = e1.getAttributeOrId(idx1);
