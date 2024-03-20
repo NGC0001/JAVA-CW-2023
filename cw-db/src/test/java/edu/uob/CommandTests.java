@@ -302,22 +302,69 @@ public class CommandTests {
         assertOk(sendCommandToServer("insert into t values ('A1B2', +2.0);"));
         assertOkUniqueRow(sendCommandToServer("select * from t;"), "1", "'A1B2'", "+2.0");
         assertError(sendCommandToServer("select * from t where;"));
+        assertError(sendCommandToServer("select * from t where true;"));
         assertError(sendCommandToServer("select * from t where ();"));
         assertError(sendCommandToServer("select * from t where (id == 0));"));
         assertError(sendCommandToServer("select * from t where (id = 0);"));
         assertError(sendCommandToServer("select * from t where (id and 0);"));
         assertError(sendCommandToServer("select * from t where (id 0 0);"));
         assertError(sendCommandToServer("select * from t where (id == id);"));
+        assertError(sendCommandToServer("select * from t where (id === 0);"));
+        assertError(sendCommandToServer("select * from t where (id <== 0);"));
         assertError(sendCommandToServer("select * from t where (0 == id);"));
         assertError(sendCommandToServer("select * from t where (id 0);"));
         assertError(sendCommandToServer("select * from t where (id == 0) and;"));
+        assertError(sendCommandToServer("select * from t where (id == 0) and true;"));
         assertError(sendCommandToServer("select * from t where id == 0 and ();"));
         assertOkCountDataRows(sendCommandToServer("select * from t where (id == 0 and ((a3 == +2.0)));"), 0);
-        assertOkCountDataRows(sendCommandToServer("select * from t where (id == 0 and ((a3 == +2.0))) or id == 1;"), 1);
-        assertOkCountDataRows(sendCommandToServer("select * from t where id == 0 and (((a3 == +2.0)) or id == 1);"), 0);
+        assertOkCountDataRows(
+              sendCommandToServer("select * from t where (id == 0 and ((a3 == +2.0))) or id == 1;"), 1);
+        assertOkCountDataRows(
+              sendCommandToServer("select * from t where id == 0 and (((a3 == +2.0)) or id == 1);"), 0);
+        assertOk(sendCommandToServer("alter table t drop a2;"));
+        assertOk(sendCommandToServer("alter table t drop a3;"));
+        response = sendCommandToServer("select * from t;");
+        assertOkHeaderRow(response, "id");
+        assertOkCountDataRows(response, 2);
+        assertOkUniqueRow(response, "0");
+        assertOkUniqueRow(response, "1");
+    }
+
+    @Test
+    public void testDeleteCommand() {
+        String response;
+        assertOk(sendCommandToServer("create database db;"));
+        assertError(sendCommandToServer("delete from t where id == 0;"));
+        assertOk(sendCommandToServer("use db;"));
+        assertOk(sendCommandToServer("create table t;"));
+        assertOk(sendCommandToServer("\ndeLetE\tfrom T wHere id== 0;"));
+        assertOk(sendCommandToServer("alter table t add 1a;"));
+        assertOk(sendCommandToServer("alter table t add 2b;"));
+        assertOk(sendCommandToServer("insert into t values (2.0, 'hello World');"));
+        assertError(sendCommandToServer("deLete from t where id== 0 and a1 >3.0;"));
+        assertError(sendCommandToServer("delete from t where id == 0;;"));
+        assertOk(sendCommandToServer("delete from t where id== 0 and 1a> 3.0;"));
+        response = sendCommandToServer("select * from t;");
+        assertOkHeaderRow(response, "id", "1a", "2b");
+        assertOkCountDataRows(response, 1);
+        assertOk(sendCommandToServer("delete from t where id != 0 and 1a <= 2.1;"));
+        response = sendCommandToServer("select * from t;");
+        assertOkCountDataRows(response, 1);
+        assertOk(sendCommandToServer("insert into t values (20.1, 'See you later');"));
+        assertError(sendCommandToServer("delete from t where id != 0 and 2b like hello;"));
+        assertOk(sendCommandToServer("delete from t where id != 0 and 2b lIKe 'hello';"));
+        response = sendCommandToServer("select * from t;");
+        assertOkCountDataRows(response, 2);
+        assertOk(sendCommandToServer("delete from t where 1a <= 100.0 and 2b like 'hello';"));
+        response = sendCommandToServer("select * from t;");
+        assertOkCountDataRows(response, 1);
+        assertOk(sendCommandToServer("delete from t where 1a <= 100.0 and 2b like 'hello';"));
+        response = sendCommandToServer("select * from t;");
+        assertOkCountDataRows(response, 1);
+        assertOkHasRow(response, "1", "20.1", "'See you later'");
     }
 }
+
 // <Update>
-// <Delete>
 // <Join>
 // Persistence
