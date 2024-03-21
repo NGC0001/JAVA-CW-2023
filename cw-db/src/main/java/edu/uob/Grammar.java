@@ -11,6 +11,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // This class checks/parses user input.
+// Better to be split into more top-level classes:
+//   lexing part, parsing part, condition/evaluation part.
 public class Grammar {
     // Grammar specific exceptions.
     public static class GrammarException extends DBException {
