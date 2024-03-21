@@ -215,76 +215,131 @@ public class Grammar {
         }
 
         public boolean evaluate(ValueMapper valueMapper) throws DBException {
-            if (valueMapper == null || this.cmpOp == null) {
+            if (valueMapper == null) {
                 throw new DBException.NullObjectException(
-                        "null arguments in condition evaluation");
+                        "null valueMapper in condition evaluation");
             }
             String value = valueMapper.getValueByKey(this.key);
-            if (value == null || this.targetValue == null) {
-                return false;
-            }
-            if (this.cmpOp == Keyword.LIKE) {
-                String valueStr = stripSingleQuote(value);
-                String targetValueStr = stripSingleQuote(this.targetValue);
-                return valueStr.contains(targetValueStr);
-            }
-            return arithmeticCompare(value, this.targetValue, this.cmpOp);
-        }
-
-        private static boolean arithmeticCompare(String value, String targetValue, Keyword op)
-                throws DBException {
-            double diff = arithmeticDiff(value, targetValue);
-            switch (op) {
-                case EQ:
-                    return diff == 0.0;
-                case GT:
-                    return diff > 0.0;
-                case LT:
-                    return diff < 0.0;
-                case GE:
-                    return diff >= 0.0;
-                case LE:
-                    return diff <= 0.0;
-                case NEQ:
-                    return diff != 0.0;
-                default:
-                    throw new GrammarException("invalid operator " + op.toString());
-            }
+            return compareValue(value, this.cmpOp, this.targetValue);
         }
     }
+
+    private static enum OrderingResult {GT, EQ, LT}
 
     private static final String idAttrName = "id";
     private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
 
-    // Try do arithmetic comparison between two given strings.
-    public static double arithmeticDiff(String value, String targetValue) {
-        if (value == null) {
-            value = "";
+    public static boolean compareValue(String value1, Keyword op, String value2)
+            throws DBException {
+        if (value1 == null || op == null || value2 == null) {
+            throw new DBException.NullObjectException(
+                    "null arguments in string comparison");
         }
-        if (targetValue == null) {
-            targetValue = "";
+        switch (op) {
+            case EQ: case GT: case LT: case GE:
+            case LE: case NEQ: case LIKE:
+                break;
+            default:
+                throw new GrammarException("illegal operator " + op.toString());
         }
+        Keyword kw1 = Keyword.getByString(value1);
+        Keyword kw2 = Keyword.getByString(value2);
+        if (kw1 == Keyword.NULL || kw2 == Keyword.NULL) {
+            // At least one of kw1 and kw2 is Keyword.NULL
+            // The other is null(not a Keyword), Keyword.NULL, or other Keyword
+            return compareKeyword(kw1, op, kw2);
+        }
+        if (op == Keyword.LIKE) {
+            value1 = stripSingleQuote(value1);
+            value2 = stripSingleQuote(value2);
+            return value1.contains(value2);
+        }
+        if (kw1 != null && kw2 != null) {
+            return compareKeyword(kw1, op, kw2);
+        }
+        return compareByOrdering(value1, op, value2);
+    }
+
+    private static boolean compareKeyword(Keyword kw1, Keyword op, Keyword kw2)
+            throws DBException {
+        switch (op) {
+            case EQ:
+                return kw1 == kw2;
+            case NEQ:
+                return kw1 != kw2;
+            case GT: case LT: case GE: case LE: case LIKE:
+                return false; // All other comparisons return false
+            default:
+                throw new GrammarException("invalid operator " + op.toString());
+        }
+    }
+
+    private static boolean compareByOrdering(String value1, Keyword op, String value2)
+            throws DBException {
+        OrderingResult ordering = getValueOrdering(value1, value2);
+        switch (op) {
+            case EQ:
+                return ordering == OrderingResult.EQ;
+            case GT:
+                return ordering == OrderingResult.GT;
+            case LT:
+                return ordering == OrderingResult.LT;
+            case GE:
+                return ordering != OrderingResult.LT;
+            case LE:
+                return ordering != OrderingResult.GT;
+            case NEQ:
+                return ordering != OrderingResult.EQ;
+            default:
+                throw new GrammarException("invalid ordering op " + op.toString());
+        }
+    }
+
+    private static OrderingResult getValueOrdering(String value1, String value2) {
         try {
-            long valueLong = Long.valueOf(value);
-            long targetValueLong = Long.valueOf(targetValue);
-            // Both integer
-            return (double) (valueLong - targetValueLong); // long -> double
+            // If both integer
+            return getOrderingLong(Long.valueOf(value1), Long.valueOf(value2));
         } catch (Exception notLong) {
         }
         try {
-            double valueDouble = Double.valueOf(value);
-            double targetValueDouble = Double.valueOf(targetValue);
-            // One double, the other double or integer
-            return valueDouble - targetValueDouble;
+            // If one double, the other double or integer
+            return getOrderingDouble(Double.valueOf(value1), Double.valueOf(value2));
         } catch (Exception notDouble) {
         }
-        if (isKeyword(value) && isKeyword(targetValue)) {
-            value = value.toLowerCase();
-            targetValue = targetValue.toLowerCase();
+        return getOrderingString(value1, value2);
+    }
+
+    private static OrderingResult getOrderingLong(long l1, long l2) {
+        if (l1 < l2) {
+            return OrderingResult.LT;
+        } else if (l1 > l2) {
+            return OrderingResult.GT;
+        } else {
+            return OrderingResult.EQ;
         }
-        String valueStr = stripSingleQuote(value);
-        String targetValueStr = stripSingleQuote(targetValue);
-        return (double) (valueStr.compareTo(targetValueStr)); // int -> double
+    }
+
+    private static OrderingResult getOrderingDouble(double d1, double d2) {
+        if (d1 < d2) {
+            return OrderingResult.LT;
+        } else if (d1 > d2) {
+            return OrderingResult.GT;
+        } else {
+            return OrderingResult.EQ;
+        }
+    }
+
+    private static OrderingResult getOrderingString(String str1, String str2) {
+        str1 = stripSingleQuote(str1);
+        str2 = stripSingleQuote(str2);
+        int cmp = str1.compareTo(str2);
+        if (cmp < 0) {
+            return OrderingResult.LT;
+        } else if (cmp > 0) {
+            return OrderingResult.GT;
+        } else {
+            return OrderingResult.EQ;
+        }
     }
 
     private static String stripSingleQuote(String str) {
@@ -302,9 +357,7 @@ public class Grammar {
         ensureMoreTokens(tokens, "empty command");
         if (!isKeyword(Keyword.SEMICOLON, tokens.popBack())) {
             throw new GrammarException("command not closed by semicolon");
-        }
-        ensureMoreTokens(tokens);
-        String cmdTypeStr = tokens.popFront();
+        } ensureMoreTokens(tokens); String cmdTypeStr = tokens.popFront();
         Keyword cmdType = Keyword.getByString(cmdTypeStr);
         if (cmdType == null) {
             throw new GrammarException("unknown command type " + cmdTypeStr);
@@ -574,13 +627,8 @@ public class Grammar {
             throw new GrammarException("invalid comparison op " + cmpOpStr);
         }
         switch (cmpOp) {
-            case EQ:
-            case GT:
-            case LT:
-            case GE:
-            case LE:
-            case NEQ:
-            case LIKE:
+            case EQ: case GT: case LT: case GE:
+            case LE: case NEQ: case LIKE:
                 break;
             default:
                 throw new GrammarException("illegal operator " + cmpOp.toString());

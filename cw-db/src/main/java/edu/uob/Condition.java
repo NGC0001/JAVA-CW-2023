@@ -14,7 +14,8 @@ public interface Condition {
         public String getValueByKey(String key) throws DBException;
     }
 
-    // Turns a condition cond into !cond
+    // Turns a condition cond into `!cond`.
+    // Be careful with negation, e.g., should `NULL < 0` == !`NULL >= 0` or not
     public static Condition negate(Condition cond) {
         return new Condition() {
             public boolean evaluate(ValueMapper valueMapper) throws DBException {

@@ -440,17 +440,17 @@ public class CommandTests {
         assertError(sendCommandToServer("join t1 and t2 on a1,id;"));
         assertError(sendCommandToServer("join t1, t2 on a1 and id;"));
         response = sendCommandToServer("\tJoin t2 anD T1 On id\tand a1;");
-        assertOkHeaderRow(response, "id", "t2.a2", "t2.b2", "t2.c2", "t1.a1", "t1.b1");
+        assertOkHeaderRow(response, "id", "t2.a2", "t2.b2", "t2.c2", "t1.b1");
         assertOkCountDataRows(response, 2);
-        assertOkHasRow(response, "0", "2", "21", "1", "1", "100");
-        assertOkHasRow(response, "1", "2", "21", "1", "1", "101");
+        assertOkHasRow(response, "0", "2", "21", "1", "100");
+        assertOkHasRow(response, "1", "2", "21", "1", "101");
         response = sendCommandToServer("join t1 and t2 on id and c2;");
-        assertOkHeaderRow(response, "id", "t1.a1", "t1.b1", "t2.a2", "t2.b2", "t2.c2");
+        assertOkHeaderRow(response, "id", "t1.a1", "t1.b1", "t2.a2", "t2.b2");
         assertOkCountDataRows(response, 2);
-        assertOkHasRow(response, "0", "1", "100", "2", "20", "0");
-        assertOkHasRow(response, "1", "1", "101", "2", "21", "1");
+        assertOkHasRow(response, "0", "1", "100", "2", "20");
+        assertOkHasRow(response, "1", "1", "101", "2", "21");
         response = sendCommandToServer("join t1 and t2 on a1 and a2;");
-        assertOkHeaderRow(response, "id", "t1.a1", "t1.b1", "t2.a2", "t2.b2", "t2.c2");
+        assertOkHeaderRow(response, "id", "t1.b1", "t2.b2", "t2.c2");
         assertOkCountDataRows(response, 0);
     }
 

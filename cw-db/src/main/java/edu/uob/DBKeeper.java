@@ -227,6 +227,8 @@ public class DBKeeper {
     private Result executeUpdate(Task.UpdateTask task) throws DBException {
         // Better to implement inside Table class
         Table table = getCurrentDatabase().getTable(task.getTableName());
+        // getAttrFieldSetter also checks whether the attribute fields
+        // to be modified are valid
         Table.AttrFieldSetter attrSetter = table.getAttrFieldSetter(task.getModification());
         List<Table.Entity> chosenEntities = table.chooseEntities(task.getCondition());
         Result result = new Result();
@@ -250,51 +252,73 @@ public class DBKeeper {
 
     private Result executeJoin(Task.JoinTask task) throws DBException {
         // Better to implement inside Database class
-        String tableNameOne = task.getTableNameOne();
-        String tableNameTwo = task.getTableNameTwo();
-        if (tableNameOne.toLowerCase().equals(tableNameTwo.toLowerCase())) {
-            throw new DBException.InvalidTableNameException(
-                    tableNameTwo, "need another table");
+        String tableName1 = task.getTableNameOne();
+        String tableName2 = task.getTableNameTwo();
+        if (tableName1.toLowerCase().equals(tableName2.toLowerCase())) {
+            throw new DBException.InvalidTableNameException(tableName2,
+                    "unable to join the same table");
         }
-        Table tableOne = getCurrentDatabase().getTable(tableNameOne);
-        Table tableTwo = getCurrentDatabase().getTable(tableNameTwo);
-        String attrOne = task.getAttrNameOne();
-        String attrTwo = task.getAttrNameTwo();
-        int idxOne = Grammar.isIdAttrName(attrOne) ? Table.Entity.idIdx
-                : tableOne.getAttrIdx(attrOne);
-        int idxTwo = Grammar.isIdAttrName(attrTwo) ? Table.Entity.idIdx
-                : tableTwo.getAttrIdx(attrTwo);
+        Table table1 = getCurrentDatabase().getTable(tableName1);
+        Table table2 = getCurrentDatabase().getTable(tableName2);
+        String attr1 = task.getAttrNameOne();
+        String attr2 = task.getAttrNameTwo();
+        int idx1 = Grammar.isIdAttrName(attr1) ? Table.Entity.idIdx : table1.getAttrIdx(attr1);
+        int idx2 = Grammar.isIdAttrName(attr2) ? Table.Entity.idIdx : table2.getAttrIdx(attr2);
         Result result = new Result();
-        List<String> header = new ArrayList<String>();
-        header.add(Grammar.getIdAttrName());
-        for (String attrName : tableOne.getAttributeNames()) {
-            header.add(tableNameOne + "." + attrName);
-        }
-        for (String attrName : tableTwo.getAttributeNames()) {
-            header.add(tableNameTwo + "." + attrName);
-        }
-        result.addRow(header);
-        joinTables(tableOne, tableTwo, idxOne, idxTwo, result);
+        result.addRow(joinTwoTableHeaders(table1, table2, tableName1, tableName2, idx1, idx2));
+        joinTableEntities(table1, table2, idx1, idx2, result);
         return result;
     }
 
-    private void joinTables(Table t1, Table t2, int idx1, int idx2, Result result)
+    private List<String> joinTwoTableHeaders(Table table1, Table table2,
+            String tableName1, String tableName2, int idx1, int idx2) {
+        List<String> newHeader = new ArrayList<String>();
+        newHeader.add(Grammar.getIdAttrName());
+        List<String> attrNames1 = table1.getAttributeNames();
+        List<String> attrNames2 = table2.getAttributeNames();
+        for (int i = 0; i < attrNames1.size(); ++i) {
+            if (i != idx1) {
+                newHeader.add(tableName1 + "." + attrNames1.get(i));
+            }
+        }
+        for (int i = 0; i < attrNames2.size(); ++i) {
+            if (i != idx2) {
+                newHeader.add(tableName2 + "." + attrNames2.get(i));
+            }
+        }
+        return newHeader;
+    }
+
+    private void joinTableEntities(Table table1, Table table2, int idx1, int idx2, Result result)
             throws DBException {
         int nextId = 0;
         // O(n^2) time complexity
-        for (Table.Entity e1 : t1.getEntities()) {
-            for (Table.Entity e2 : t2.getEntities()) {
+        for (Table.Entity e1 : table1) {
+            for (Table.Entity e2 : table2) {
                 String v1 = e1.getAttributeOrId(idx1);
                 String v2 = e2.getAttributeOrId(idx2);
-                if (Grammar.arithmeticDiff(v1, v2) == 0.0) {
-                    List<String> valueRow = new ArrayList<String>();
-                    valueRow.add(String.valueOf(nextId++));
-                    valueRow.addAll(e1.getAttributes());
-                    valueRow.addAll(e2.getAttributes());
-                    result.addRow(valueRow);
+                if (Grammar.compareValue(v1, Grammar.Keyword.EQ, v2)) {
+                    result.addRow(joinTwoEntities(nextId++, e1, e2, idx1, idx2));
                 }
             }
         }
+    }
+
+    private List<String> joinTwoEntities(int id, Table.Entity e1, Table.Entity e2,
+            int idx1, int idx2) throws DBException {
+        List<String> valueRow = new ArrayList<String>();
+        valueRow.add(String.valueOf(id));
+        for (int i = 0; i < e1.getNumberOfAttributes(); ++i) {
+            if (i != idx1) {
+                valueRow.add(e1.getAttributeOrId(i));
+            }
+        }
+        for (int i = 0; i < e2.getNumberOfAttributes(); ++i) {
+            if (i != idx2) {
+                valueRow.add(e2.getAttributeOrId(i));
+            }
+        }
+        return valueRow;
     }
 
     public void addDatabase(String databaseName, Database db) throws DBException {

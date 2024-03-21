@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -21,7 +22,7 @@ import java.util.regex.Pattern;
 // This class represents a table.
 // Some error checkings are done twice:
 //   when parsing user input by Grammar class, and here by Table class.
-public class Table {
+public class Table implements Iterable<Table.Entity> {
     // Table specific exceptions.
     public static class TableException extends DBException {
         @Serial
@@ -159,10 +160,6 @@ public class Table {
                 throw new TableException.InvalidAttributeIndexException(idx);
             }
             this.attributes.remove(idx);
-        }
-
-        public List<String> getAttributes() {
-            return new ArrayList<String>(this.attributes);
         }
 
         public int getNumberOfAttributes() {
@@ -506,9 +503,20 @@ public class Table {
         addEntity(entityId, attrValues);
     }
 
-    // Dangerous
-    protected List<Entity> getEntities() {
-        return this.entities;
+    public Iterator<Entity> iterator() {
+        return new Iterator<Entity>() {
+            int nextIdx = 0;
+
+            @Override
+            public boolean hasNext() {
+                return nextIdx < getNumberOfEntities();
+            }
+
+            @Override
+            public Entity next() {
+                return entities.get(nextIdx++);
+            }
+        };
     }
 
     public int getNumberOfEntities() {
