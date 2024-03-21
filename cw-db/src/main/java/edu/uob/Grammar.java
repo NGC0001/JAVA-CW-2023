@@ -224,7 +224,9 @@ public class Grammar {
         }
     }
 
-    private static enum OrderingResult {GT, EQ, LT}
+    private static enum OrderingResult {
+        GT, EQ, LT
+    }
 
     private static final String idAttrName = "id";
     private static final String allSymbols = "!#$%&()*+,-./:;>=<?@[\\]^_`{}~";
@@ -236,8 +238,7 @@ public class Grammar {
                     "null arguments in string comparison");
         }
         switch (op) {
-            case EQ: case GT: case LT: case GE:
-            case LE: case NEQ: case LIKE:
+            case EQ: case GT: case LT: case GE: case LE: case NEQ: case LIKE:
                 break;
             default:
                 throw new GrammarException("illegal operator " + op.toString());
@@ -357,7 +358,9 @@ public class Grammar {
         ensureMoreTokens(tokens, "empty command");
         if (!isKeyword(Keyword.SEMICOLON, tokens.popBack())) {
             throw new GrammarException("command not closed by semicolon");
-        } ensureMoreTokens(tokens); String cmdTypeStr = tokens.popFront();
+        }
+        ensureMoreTokens(tokens);
+        String cmdTypeStr = tokens.popFront();
         Keyword cmdType = Keyword.getByString(cmdTypeStr);
         if (cmdType == null) {
             throw new GrammarException("unknown command type " + cmdTypeStr);
@@ -627,8 +630,7 @@ public class Grammar {
             throw new GrammarException("invalid comparison op " + cmpOpStr);
         }
         switch (cmpOp) {
-            case EQ: case GT: case LT: case GE:
-            case LE: case NEQ: case LIKE:
+            case EQ: case GT: case LT: case GE: case LE: case NEQ: case LIKE:
                 break;
             default:
                 throw new GrammarException("illegal operator " + cmpOp.toString());

@@ -260,65 +260,51 @@ public class DBKeeper {
         }
         Table table1 = getCurrentDatabase().getTable(tableName1);
         Table table2 = getCurrentDatabase().getTable(tableName2);
-        String attr1 = task.getAttrNameOne();
-        String attr2 = task.getAttrNameTwo();
-        int idx1 = Grammar.isIdAttrName(attr1) ? Table.Entity.idIdx : table1.getAttrIdx(attr1);
-        int idx2 = Grammar.isIdAttrName(attr2) ? Table.Entity.idIdx : table2.getAttrIdx(attr2);
+        String[] comparedAttrAndId1 = { task.getAttrNameOne(), Grammar.getIdAttrName() };
+        String[] comparedAttrAndId2 = { task.getAttrNameTwo(), Grammar.getIdAttrName() };
+        Table.AttrIdFieldGetter attrGetter1 = table1.getAttrIdFieldGetter(comparedAttrAndId1);
+        Table.AttrIdFieldGetter attrGetter2 = table2.getAttrIdFieldGetter(comparedAttrAndId2);
         Result result = new Result();
-        result.addRow(joinTwoTableHeaders(table1, table2, tableName1, tableName2, idx1, idx2));
-        joinTableEntities(table1, table2, idx1, idx2, result);
+        List<String> newHeader = new ArrayList<String>();
+        newHeader.add(Grammar.getIdAttrName());
+        attrGetter1.complement().getSelectedAttrNames().forEach(
+                (attrName1) -> {
+                    newHeader.add(tableName1 + "." + attrName1);
+                });
+        attrGetter2.complement().getSelectedAttrNames().forEach(
+                (attrName2) -> {
+                    newHeader.add(tableName2 + "." + attrName2);
+                });
+        result.addRow(newHeader);
+        joinTableEntities(table1, table2, attrGetter1, attrGetter2, result);
         return result;
     }
 
-    private List<String> joinTwoTableHeaders(Table table1, Table table2,
-            String tableName1, String tableName2, int idx1, int idx2) {
-        List<String> newHeader = new ArrayList<String>();
-        newHeader.add(Grammar.getIdAttrName());
-        List<String> attrNames1 = table1.getAttributeNames();
-        List<String> attrNames2 = table2.getAttributeNames();
-        for (int i = 0; i < attrNames1.size(); ++i) {
-            if (i != idx1) {
-                newHeader.add(tableName1 + "." + attrNames1.get(i));
-            }
-        }
-        for (int i = 0; i < attrNames2.size(); ++i) {
-            if (i != idx2) {
-                newHeader.add(tableName2 + "." + attrNames2.get(i));
-            }
-        }
-        return newHeader;
-    }
-
-    private void joinTableEntities(Table table1, Table table2, int idx1, int idx2, Result result)
-            throws DBException {
+    private void joinTableEntities(Table table1, Table table2, Table.AttrIdFieldGetter attrGetter1,
+            Table.AttrIdFieldGetter attrGetter2, Result result) throws DBException {
+        Table.AttrIdFieldGetter displayAttrGetter1 = attrGetter1.complement();
+        Table.AttrIdFieldGetter displayAttrGetter2 = attrGetter2.complement();
         int nextId = 0;
         // O(n^2) time complexity
         for (Table.Entity e1 : table1) {
             for (Table.Entity e2 : table2) {
-                String v1 = e1.getAttributeOrId(idx1);
-                String v2 = e2.getAttributeOrId(idx2);
-                if (Grammar.compareValue(v1, Grammar.Keyword.EQ, v2)) {
-                    result.addRow(joinTwoEntities(nextId++, e1, e2, idx1, idx2));
+                String cmpValue1 = attrGetter1.getSelectedValues(e1).get(0);
+                String cmpValue2 = attrGetter2.getSelectedValues(e2).get(0);
+                if (Grammar.compareValue(cmpValue1, Grammar.Keyword.EQ, cmpValue2)) {
+                    List<String> valueRow = new ArrayList<String>();
+                    valueRow.add(String.valueOf(nextId++));
+                    displayAttrGetter1.getSelectedValues(e1).forEach(
+                            (v1) -> {
+                                valueRow.add(v1);
+                            });
+                    displayAttrGetter2.getSelectedValues(e2).forEach(
+                            (v2) -> {
+                                valueRow.add(v2);
+                            });
+                    result.addRow(valueRow);
                 }
             }
         }
-    }
-
-    private List<String> joinTwoEntities(int id, Table.Entity e1, Table.Entity e2,
-            int idx1, int idx2) throws DBException {
-        List<String> valueRow = new ArrayList<String>();
-        valueRow.add(String.valueOf(id));
-        for (int i = 0; i < e1.getNumberOfAttributes(); ++i) {
-            if (i != idx1) {
-                valueRow.add(e1.getAttributeOrId(i));
-            }
-        }
-        for (int i = 0; i < e2.getNumberOfAttributes(); ++i) {
-            if (i != idx2) {
-                valueRow.add(e2.getAttributeOrId(i));
-            }
-        }
-        return valueRow;
     }
 
     public void addDatabase(String databaseName, Database db) throws DBException {

@@ -218,6 +218,7 @@ public class Table implements Iterable<Table.Entity> {
         private List<String> selectedAttr;
         private List<Integer> selectedIdx;
 
+        // selectedAttrNames can have duplicate elements
         protected AttrIdFieldGetter(List<String> selectedAttrNames) throws DBException {
             this.selectedAttr = new ArrayList<String>();
             this.selectedIdx = new ArrayList<Integer>();
@@ -249,6 +250,25 @@ public class Table implements Iterable<Table.Entity> {
                 selected.add(entity.getAttributeOrId(i));
             }
             return selected;
+        }
+
+        // Returns the complementary getter
+        public AttrIdFieldGetter complement() throws DBException {
+            HashSet<String> selectSet = new HashSet<String>();
+            this.selectedAttr.forEach((e) -> {
+                selectSet.add(e.toLowerCase());
+            });
+            List<String> complementList = new ArrayList<String>();
+            String idAttr = Grammar.getIdAttrName();
+            if (!selectSet.contains(idAttr.toLowerCase())) {
+                complementList.add(idAttr);
+            }
+            for (String attrName : attrNames) {
+                if (!selectSet.contains(attrName.toLowerCase())) {
+                    complementList.add(attrName);
+                }
+            }
+            return new AttrIdFieldGetter(complementList);
         }
     }
 
@@ -529,6 +549,10 @@ public class Table implements Iterable<Table.Entity> {
 
     public AttrIdFieldIndexMapper getAttrIdFieldIndexMapper() {
         return new AttrIdFieldIndexMapper();
+    }
+
+    public AttrIdFieldGetter getAttrIdFieldGetter(String[] selectedAttrNames) throws DBException {
+        return getAttrIdFieldGetter(Arrays.asList(selectedAttrNames));
     }
 
     public AttrIdFieldGetter getAttrIdFieldGetter(List<String> selectedAttrNames)
