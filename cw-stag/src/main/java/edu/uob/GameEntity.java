@@ -17,9 +17,3 @@ public abstract class GameEntity {
         return description;
     }
 }
-
-public class Figure extends GameEntity {
-}
-
-public class Player extends Figure {
-}
