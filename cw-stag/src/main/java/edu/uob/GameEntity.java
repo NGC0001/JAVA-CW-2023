@@ -1,23 +1,25 @@
 package edu.uob;
 
-public abstract class GameEntity
-{
+public abstract class GameEntity {
     private String name;
     private String description;
 
-    public GameEntity(String name, String description)
-    {
+    public GameEntity(String name, String description) {
         this.name = name;
         this.description = description;
     }
 
-    public String getName()
-    {
+    public String getName() {
         return name;
     }
 
-    public String getDescription()
-    {
+    public String getDescription() {
         return description;
     }
+}
+
+public class Figure extends GameEntity {
+}
+
+public class Player extends Figure {
 }

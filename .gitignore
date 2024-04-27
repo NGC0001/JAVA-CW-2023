@@ -1,6 +1,9 @@
 # IDE directories
 .vscode/
 
+# Dot file visualisation pictures
+cw-stag/config/*.png
+
 # Database persistence directory
 cw-db/databases/
 

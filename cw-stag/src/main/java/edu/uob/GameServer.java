@@ -1,18 +1,32 @@
 package edu.uob;
 
+import com.alexmerz.graphviz.ParseException;
+import com.alexmerz.graphviz.Parser;
+import com.alexmerz.graphviz.objects.Edge;
+import com.alexmerz.graphviz.objects.Graph;
+import com.alexmerz.graphviz.objects.Node;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.utils.HashMap;
+import java.utils.Map;
 
 public final class GameServer {
 
     private static final char END_OF_TRANSMISSION = 4;
+
+    private Map<String, GameEntity> entities;
+    private Map<String, GameAction> actions;
+    private Map<String, Player> players;
 
     public static void main(String[] args) throws IOException {
         File entitiesFile = Paths.get("config" + File.separator + "basic-entities.dot").toAbsolutePath().toFile();
@@ -30,6 +44,63 @@ public final class GameServer {
     */
     public GameServer(File entitiesFile, File actionsFile) {
         // TODO implement your server logic here
+        this.entities = loadEntitiesFromFile(entitiesFile);
+        this.actions = loadActionsFromFile(actionsFile);
+        this·players = new HashMap<String, Player>();
+    }
+
+    private Map<String, GameEntity> loadEntitiesFromFile(File entitiesFile) {
+        Map<String, GameEntity>() entities = new HashMap<String, GameEntity>();
+        try {
+            Parser parser = new Parser();
+            FileReader reader = new FileReader(entitiesFile);
+            parser.parse(reader);
+            Graph wholeDocument = parser.getGraphs().get(0);
+            ArrayList<Graph> sections = wholeDocument.getSubgraphs();
+            // The locations will always be in the first subgraph
+            parseLocations(sections.get(0));
+            // The paths will always be in the second subgraph
+            parsePaths(sections.get(1));
+
+        } catch (FileNotFoundException fnfe) {
+            fail("FileNotFoundException was thrown when attempting to read basic entities file");
+        } catch (ParseException pe) {
+            fail("ParseException was thrown when attempting to read basic entities file");
+        }
+        return entities;
+    }
+
+    private void parseLocations(Graph locations) {
+        for (Graph localtion : locations.getSubgraphs()) {
+            parseLocation(location);
+        }
+    }
+
+    private void parseLocation(Graph location) {
+        Node locationDetails = firstLocation.getNodes(false).get(0);
+        // Yes, you do need to get the ID twice !
+        String locationName = locationDetails.getId().getId();
+    }
+
+    private void parsePaths(Graph paths) {
+        for (Edge path : paths.getEdges()) {
+            parsePath(path);
+        }
+    }
+
+    private void parsePath(Edge path) {
+            Node fromLocation = firstPath.getSource().getNode();
+            String fromName = fromLocation.getId().getId();
+            Node toLocation = firstPath.getTarget().getNode();
+            String toName = toLocation.getId().getId();
+
+            assertEquals("cabin", fromName, "First path should have been from 'cabin'");
+            assertEquals("forest", toName, "First path should have been to 'forest'");
+    }
+
+    private Map<String, GameAction> loadActionsFromFile(File actionsFile) {
+        Map<String, GameAction>() actions = new HashMap<String, GameAction>();
+        return actions;
     }
 
     /**
