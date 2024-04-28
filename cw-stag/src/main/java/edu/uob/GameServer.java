@@ -72,10 +72,16 @@ public final class GameServer {
     }
 
     private void parseLocation(Graph location) {
-        Node locationDetails = location.getNodes(false).get(0);
-        // Yes, you do need to get the ID twice !
+        Node locationDetails = location.getNodes(true).get(0);
         String locationName = locationDetails.getId().getId();
-        System.out.println(locationName);
+        System.out.println("Location " + locationName);
+        for (Graph entities : location.getSubgraphs()) {
+            String entityType = entities.getId().getId();
+            for (Node entity : entities.getNodes(true)) {
+                String entityName = entity.getId().getId();
+                System.out.println("  " + entityType + ": " + entityName);
+            }
+        }
     }
 
     private void parsePaths(Graph paths) {
