@@ -65,7 +65,17 @@ public final class GameServer {
         } catch (Exception e) {
             System.err.println("when reading entities file: " + e.toString());
         }
-        System.out.println(this.entities.toString());
+        printEntities();
+    }
+
+    // For debug use.
+    public void printEntities() {
+        this.entities.forEach((name, entity) -> {
+            if (entity instanceof Location) {
+                Location location = (Location)entity;
+                location.printEntities();
+            }
+        });
     }
 
     private void parseAllLocationsGraph(Graph allLocationsGraph) {
@@ -76,35 +86,30 @@ public final class GameServer {
 
     private void parseLocationGraph(Graph locationGraph) {
         Node locationDetails = locationGraph.getNodes(true).get(0);
-        String locationName = locationDetails.getId().getId();
+        String locationName = locationDetails.getId().getId().toLowerCase();
         String locationDescription = locationDetails.getAttribute("description");
         Location location = new Location(locationName, locationDescription);
         addEntity(location);
         for (Graph entitiesGraph : locationGraph.getSubgraphs()) {
-            String entityType = entitiesGraph.getId().getId();
+            String entityType = entitiesGraph.getId().getId().toLowerCase();
             for (Node entityNode : entitiesGraph.getNodes(true)) {
-                String entityName = entityNode.getId().getId();
+                String entityName = entityNode.getId().getId().toLowerCase();
                 String entityDescription = entityNode.getAttribute("description");
-                GameEntity entity = createEntity(entityType, entityName, entityDescription);
+                GameEntity entity = createLocatedEntity(entityType, entityName, entityDescription, location);
                 addEntity(entity);
             }
         }
     }
 
     // TODO: ensure valid entity name
-    public static GameEntity createEntity(String type, String name, String description) {
+    public static GameEntity createLocatedEntity(String type, String name, String description, Location location) {
         if (type == null) { return null; }
         switch (type) {
-            case entityTypeArtefact: return new Artefact(name, description);
-            case entityTypeFurniture: return new Furniture(name, description);
-            case entityTypeCharacter: return new Character(name, description);
+            case entityTypeArtefact: return new Artefact(name, description, location);
+            case entityTypeFurniture: return new Furniture(name, description, location);
+            case entityTypeCharacter: return new Character(name, description, location);
             default: return null;
         }
-    }
-
-    public GameEntity addEntity(GameEntity entity) {
-        if (entity == null) { return null; }
-        return this.entities.put(entity.getName(), entity);
     }
 
     private void parsePathsGraph(Graph pathsGraph) {
@@ -114,14 +119,29 @@ public final class GameServer {
     }
 
     private void parsePath(Edge pathEdge) {
-        Node fromLocation = pathEdge.getSource().getNode();
-        String fromName = fromLocation.getId().getId();
-        Node toLocation = pathEdge.getTarget().getNode();
-        String toName = toLocation.getId().getId();
-        System.out.println(fromName + "-->" + toName);
+        Node fromNode = pathEdge.getSource().getNode();
+        String fromLocationName = fromNode.getId().getId().toLowerCase();
+        GameEntity fromEntity = getEntity(fromLocationName);
+        if (fromEntity == null || !(fromEntity instanceof Location)) { return; }
+        Location fromLocation = (Location)(fromEntity);
+        Node toNode = pathEdge.getTarget().getNode();
+        String toLocationName = toNode.getId().getId().toLowerCase();
+        GameEntity toEntity = getEntity(toLocationName);
+        if (toEntity == null || !(toEntity instanceof Location)) { return; }
+        Location toLocation = (Location)(toEntity);
+        fromLocation.addPathTo(toLocation);
     }
 
     private void loadActionsFromFile(File actionsFile) {
+    }
+
+    public GameEntity getEntity(String name) {
+        return this.entities.get(name);
+    }
+
+    public GameEntity addEntity(GameEntity entity) {
+        if (entity == null) { return null; }
+        return this.entities.put(entity.getName(), entity);
     }
 
     /**

@@ -19,6 +19,6 @@ public abstract class GameEntity {
 
     @Override
     public String toString() {
-        return getClass().getName() + "(" + getName() + ")";
+        return this.name + "<" + getClass().getSimpleName() + ">(" + this.description + ")";
     }
 }

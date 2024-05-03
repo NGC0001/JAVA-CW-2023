@@ -1,7 +1,7 @@
 package edu.uob;
 
-public class Furniture extends GameEntity {
-    public Furniture(String name, String description) {
-        super(name, description);
+public class Furniture extends LocatedEntity {
+    public Furniture(String name, String description, Location location) {
+        super(name, description, location);
     }
 }
