@@ -21,6 +21,9 @@ import java.util.Map;
 public final class GameServer {
 
     private static final char END_OF_TRANSMISSION = 4;
+    public static final String entityTypeArtefact = "artefacts";
+    public static final String entityTypeFurniture = "furniture";
+    public static final String entityTypeCharacter = "characters";
 
     private Map<String, GameEntity> entities;
     private Map<String, GameAction> actions;
@@ -41,14 +44,14 @@ public final class GameServer {
     * @param actionsFile The game configuration file containing all game actions to use in your game
     */
     public GameServer(File entitiesFile, File actionsFile) {
-        // TODO implement your server logic here
-        this.entities = loadEntitiesFromFile(entitiesFile);
-        this.actions = loadActionsFromFile(actionsFile);
+        this.entities = new HashMap<String, GameEntity>();
+        this.actions = new HashMap<String, GameAction>();
         this.players = new HashMap<String, Player>();
+        loadEntitiesFromFile(entitiesFile);
+        loadActionsFromFile(actionsFile);
     }
 
-    private Map<String, GameEntity> loadEntitiesFromFile(File entitiesFile) {
-        Map<String, GameEntity> entities = new HashMap<String, GameEntity>();
+    private void loadEntitiesFromFile(File entitiesFile) {
         try {
             Parser parser = new Parser();
             FileReader reader = new FileReader(entitiesFile);
@@ -56,51 +59,69 @@ public final class GameServer {
             Graph wholeDocument = parser.getGraphs().get(0);
             ArrayList<Graph> sections = wholeDocument.getSubgraphs();
             // The locations will always be in the first subgraph
-            parseLocations(sections.get(0));
+            parseAllLocationsGraph(sections.get(0));
             // The paths will always be in the second subgraph
-            parsePaths(sections.get(1));
+            parsePathsGraph(sections.get(1));
         } catch (Exception e) {
             System.err.println("when reading entities file: " + e.toString());
         }
-        return entities;
+        System.out.println(this.entities.toString());
     }
 
-    private void parseLocations(Graph locations) {
-        for (Graph location : locations.getSubgraphs()) {
-            parseLocation(location);
+    private void parseAllLocationsGraph(Graph allLocationsGraph) {
+        for (Graph locationGraph : allLocationsGraph.getSubgraphs()) {
+            parseLocationGraph(locationGraph);
         }
     }
 
-    private void parseLocation(Graph location) {
-        Node locationDetails = location.getNodes(true).get(0);
+    private void parseLocationGraph(Graph locationGraph) {
+        Node locationDetails = locationGraph.getNodes(true).get(0);
         String locationName = locationDetails.getId().getId();
-        System.out.println("Location " + locationName);
-        for (Graph entities : location.getSubgraphs()) {
-            String entityType = entities.getId().getId();
-            for (Node entity : entities.getNodes(true)) {
-                String entityName = entity.getId().getId();
-                System.out.println("  " + entityType + ": " + entityName);
+        String locationDescription = locationDetails.getAttribute("description");
+        Location location = new Location(locationName, locationDescription);
+        addEntity(location);
+        for (Graph entitiesGraph : locationGraph.getSubgraphs()) {
+            String entityType = entitiesGraph.getId().getId();
+            for (Node entityNode : entitiesGraph.getNodes(true)) {
+                String entityName = entityNode.getId().getId();
+                String entityDescription = entityNode.getAttribute("description");
+                GameEntity entity = createEntity(entityType, entityName, entityDescription);
+                addEntity(entity);
             }
         }
     }
 
-    private void parsePaths(Graph paths) {
-        for (Edge path : paths.getEdges()) {
-            parsePath(path);
+    // TODO: ensure valid entity name
+    public static GameEntity createEntity(String type, String name, String description) {
+        if (type == null) { return null; }
+        switch (type) {
+            case entityTypeArtefact: return new Artefact(name, description);
+            case entityTypeFurniture: return new Furniture(name, description);
+            case entityTypeCharacter: return new Character(name, description);
+            default: return null;
         }
     }
 
-    private void parsePath(Edge path) {
-        Node fromLocation = path.getSource().getNode();
+    public GameEntity addEntity(GameEntity entity) {
+        if (entity == null) { return null; }
+        return this.entities.put(entity.getName(), entity);
+    }
+
+    private void parsePathsGraph(Graph pathsGraph) {
+        for (Edge pathEdge : pathsGraph.getEdges()) {
+            parsePath(pathEdge);
+        }
+    }
+
+    private void parsePath(Edge pathEdge) {
+        Node fromLocation = pathEdge.getSource().getNode();
         String fromName = fromLocation.getId().getId();
-        Node toLocation = path.getTarget().getNode();
+        Node toLocation = pathEdge.getTarget().getNode();
         String toName = toLocation.getId().getId();
         System.out.println(fromName + "-->" + toName);
     }
 
-    private Map<String, GameAction> loadActionsFromFile(File actionsFile) {
-        Map<String, GameAction> actions = new HashMap<String, GameAction>();
-        return actions;
+    private void loadActionsFromFile(File actionsFile) {
     }
 
     /**
