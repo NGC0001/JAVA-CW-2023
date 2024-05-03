@@ -10,10 +10,15 @@ public abstract class GameEntity {
     }
 
     public String getName() {
-        return name;
+        return this.name;
     }
 
     public String getDescription() {
-        return description;
+        return this.description;
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getName() + "(" + getName() + ")";
     }
 }
