@@ -7,6 +7,8 @@ public class LocatedEntity extends GameEntity {
         super(name, description);
         if (location != null) {
             location.addLocatedEntity(this);
+        } else {
+            this.location = null;
         }
     }
 

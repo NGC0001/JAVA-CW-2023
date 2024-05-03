@@ -17,6 +17,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 public final class GameServer {
 
@@ -66,16 +71,6 @@ public final class GameServer {
             System.err.println("when reading entities file: " + e.toString());
         }
         printEntities();
-    }
-
-    // For debug use.
-    public void printEntities() {
-        this.entities.forEach((name, entity) -> {
-            if (entity instanceof Location) {
-                Location location = (Location)entity;
-                location.printEntities();
-            }
-        });
     }
 
     private void parseAllLocationsGraph(Graph allLocationsGraph) {
@@ -133,6 +128,23 @@ public final class GameServer {
     }
 
     private void loadActionsFromFile(File actionsFile) {
+        try {
+            DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document document = builder.parse(actionsFile);
+            Element root = document.getDocumentElement();
+            NodeList actions = root.getChildNodes();
+            // Get the first action (only the odd items are actually actions - 1, 3, 5 etc.)
+            Element firstAction = (Element) actions.item(1);
+            parseActionElement(firstAction);
+        } catch (Exception e) {
+            System.err.println("when reading actions file: " + e.toString());
+        }
+    }
+
+    private void parseActionElement(Element actionElement) {
+        Element triggers = (Element) actionElement.getElementsByTagName("triggers").item(0);
+        // Get the first trigger phrase
+        String firstTriggerPhrase = triggers.getElementsByTagName("keyphrase").item(0).getTextContent();
     }
 
     public GameEntity getEntity(String name) {
@@ -142,6 +154,16 @@ public final class GameServer {
     public GameEntity addEntity(GameEntity entity) {
         if (entity == null) { return null; }
         return this.entities.put(entity.getName(), entity);
+    }
+
+    // For debug use.
+    public void printEntities() {
+        this.entities.forEach((name, entity) -> {
+            if (entity instanceof Location) {
+                Location location = (Location)entity;
+                location.printEntities();
+            }
+        });
     }
 
     /**
