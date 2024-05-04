@@ -3,13 +3,9 @@ package edu.uob;
 public class LocatedEntity extends GameEntity {
     private Location location;
 
-    public LocatedEntity(String name, String description, Location location) {
+    public LocatedEntity(String name, String description) {
         super(name, description);
-        if (location != null) {
-            location.addLocatedEntity(this);
-        } else {
-            this.location = null;
-        }
+        this.location = null;
     }
 
     public Location getLocation() {

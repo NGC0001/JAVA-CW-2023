@@ -101,12 +101,17 @@ public final class GameServer {
     // TODO: ensure valid entity name
     public static GameEntity createLocatedEntity(String type, String name, String description, Location location) {
         if (type == null) { return null; }
+        LocatedEntity entity = null;
         switch (type) {
-            case entityTypeArtefact: return new Artefact(name, description, location);
-            case entityTypeFurniture: return new Furniture(name, description, location);
-            case entityTypeCharacter: return new Character(name, description, location);
-            default: return null;
+            case entityTypeArtefact: { entity = new Artefact(name, description); break; }
+            case entityTypeFurniture: { entity = new Furniture(name, description); break; }
+            case entityTypeCharacter: { entity = new Character(name, description); break; }
+            default: { entity = null; break; }
         }
+        if (location != null && entity != null) {
+            location.addLocatedEntity(entity);
+        }
+        return entity;
     }
 
     private void parsePathsGraph(Graph pathsGraph) {
