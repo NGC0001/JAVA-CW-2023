@@ -35,6 +35,7 @@ public final class GameServer {
     private Map<String, GameEntity> entities;
     private List<Command> commands;
     private Map<String, Player> players;
+    private Location playerBornLocation;
 
     public static void main(String[] args) throws IOException {
         File entitiesFile = Paths.get("config" + File.separator + "basic-entities.dot").toAbsolutePath().toFile();
@@ -54,6 +55,8 @@ public final class GameServer {
         this.entities = new HashMap<String, GameEntity>();
         this.commands = new ArrayList<Command>();
         this.players = new HashMap<String, Player>();
+        this.commands.addAll(Arrays.asList(BuiltinCommand.values()));
+        this.playerBornLocation = null;
         loadEntitiesFromFile(entitiesFile);
         loadActionsFromFile(actionsFile);
     }
@@ -86,6 +89,9 @@ public final class GameServer {
         String locationName = locationDetails.getId().getId().toLowerCase();
         String locationDescription = locationDetails.getAttribute("description");
         Location location = new Location(locationName, locationDescription);
+        if (this.playerBornLocation == null) {
+            this.playerBornLocation = location;
+        }
         if (!addEntity(location)) { return; }
         for (Graph entitiesGraph : locationGraph.getSubgraphs()) {
             String entityType = entitiesGraph.getId().getId().toLowerCase();
@@ -100,7 +106,7 @@ public final class GameServer {
         }
     }
 
-    public static LocatedEntity createLocatedEntity(String type, String name, String description) {
+    private static LocatedEntity createLocatedEntity(String type, String name, String description) {
         if (type == null) { return null; }
         switch (type) {
             case entityTypeArtefact: return new Artefact(name, description);
@@ -150,12 +156,12 @@ public final class GameServer {
         String firstTriggerPhrase = triggers.getElementsByTagName("keyphrase").item(0).getTextContent();
     }
 
-    public GameEntity getEntity(String name) {
+    private GameEntity getEntity(String name) {
         return this.entities.get(name);
     }
 
     // TODO: ensure valid entity name
-    public boolean addEntity(GameEntity entity) {
+    private boolean addEntity(GameEntity entity) {
         if (entity == null) { return false; }
         return this.entities.putIfAbsent(entity.getName(), entity) == null;
     }
@@ -176,11 +182,17 @@ public final class GameServer {
     * @param command The incoming command to be processed
     */
     public String handleCommand(String command) {
-        List<String> userCommand = Arrays.asList(command.split(" "));
-        Task matchedTask = null;
         try {
+            String[] playerNameAndCommand = command.toLowerCase().split(":", 2);
+            if (playerNameAndCommand.length != 2) {
+                throw new GameException.InvalidCommandFormatException();
+            }
+            String playerName = playerNameAndCommand[0].trim();
+            Player player = getOrCreatePlayer(playerName);
+            List<String> playerCommand = Arrays.asList(playerNameAndCommand[1].trim().split("\\s+"));
+            Task matchedTask = null;
             for (Command cmd : this.commands) {
-                Task task = cmd.buildTask(null, userCommand, this.entities);
+                Task task = cmd.buildTask(player, playerCommand, this.entities);
                 if (task == null) { continue; }
                 if (matchedTask != null) {
                     throw new GameException.AmbiguousCommandException();
@@ -194,6 +206,17 @@ public final class GameServer {
         } catch (Exception e) {
             return "Error: " + e.getMessage();
         }
+    }
+
+    private Player getOrCreatePlayer(String playerName) {
+        Player player = this.players.get(playerName);
+        if (player != null) {
+            return player;
+        }
+        player = new Player(playerName);
+        this.players.put(playerName, player);
+        this.playerBornLocation.addLocatedEntity(player);
+        return player;
     }
 
     /**

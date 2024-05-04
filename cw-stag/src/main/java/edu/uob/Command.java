@@ -1,6 +1,5 @@
 package edu.uob;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,9 +13,6 @@ public interface Command {
         Map<String, GameEntity> subjects = new HashMap<String, GameEntity>();
         for (String word : playerCommand) {
             if (wordMatchesTriggers(word, triggers)) {
-                if (triggerMatched) {
-                    return null;
-                }
                 triggerMatched = true;
                 continue;
             }

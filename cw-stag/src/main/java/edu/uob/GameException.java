@@ -10,6 +10,15 @@ public abstract class GameException extends Exception {
         super(message);
     }
 
+    public static class InvalidCommandFormatException extends GameException {
+        @Serial
+        private static final long serialVersionUID = 1;
+
+        public InvalidCommandFormatException() {
+            super("invalid command format");
+        }
+    }
+
     public static class AmbiguousCommandException extends GameException {
         @Serial
         private static final long serialVersionUID = 1;
