@@ -72,7 +72,7 @@ public final class GameServer {
         } catch (Exception e) {
             System.err.println("when reading entities file: " + e.toString());
         }
-        printEntities();
+        // printEntities(); // For debug.
     }
 
     private void parseAllLocationsGraph(Graph allLocationsGraph) {
@@ -86,32 +86,28 @@ public final class GameServer {
         String locationName = locationDetails.getId().getId().toLowerCase();
         String locationDescription = locationDetails.getAttribute("description");
         Location location = new Location(locationName, locationDescription);
-        addEntity(location);
+        if (!addEntity(location)) { return; }
         for (Graph entitiesGraph : locationGraph.getSubgraphs()) {
             String entityType = entitiesGraph.getId().getId().toLowerCase();
             for (Node entityNode : entitiesGraph.getNodes(true)) {
                 String entityName = entityNode.getId().getId().toLowerCase();
                 String entityDescription = entityNode.getAttribute("description");
-                GameEntity entity = createLocatedEntity(entityType, entityName, entityDescription, location);
-                addEntity(entity);
+                LocatedEntity entity = createLocatedEntity(entityType, entityName, entityDescription);
+                if (addEntity(entity)) {
+                    location.addLocatedEntity(entity);
+                }
             }
         }
     }
 
-    // TODO: ensure valid entity name
-    public static GameEntity createLocatedEntity(String type, String name, String description, Location location) {
+    public static LocatedEntity createLocatedEntity(String type, String name, String description) {
         if (type == null) { return null; }
-        LocatedEntity entity = null;
         switch (type) {
-            case entityTypeArtefact: { entity = new Artefact(name, description); break; }
-            case entityTypeFurniture: { entity = new Furniture(name, description); break; }
-            case entityTypeCharacter: { entity = new Character(name, description); break; }
-            default: { entity = null; break; }
+            case entityTypeArtefact: return new Artefact(name, description);
+            case entityTypeFurniture: return new Furniture(name, description);
+            case entityTypeCharacter: return new Character(name, description);
+            default: return null;
         }
-        if (location != null && entity != null) {
-            location.addLocatedEntity(entity);
-        }
-        return entity;
     }
 
     private void parsePathsGraph(Graph pathsGraph) {
@@ -158,12 +154,12 @@ public final class GameServer {
         return this.entities.get(name);
     }
 
-    public GameEntity addEntity(GameEntity entity) {
-        if (entity == null) { return null; }
-        return this.entities.put(entity.getName(), entity);
+    // TODO: ensure valid entity name
+    public boolean addEntity(GameEntity entity) {
+        if (entity == null) { return false; }
+        return this.entities.putIfAbsent(entity.getName(), entity) == null;
     }
 
-    // For debug use.
     public void printEntities() {
         this.entities.forEach((name, entity) -> {
             if (entity instanceof Location) {

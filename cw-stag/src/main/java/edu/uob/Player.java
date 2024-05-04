@@ -10,4 +10,8 @@ public class Player extends Character {
         super(name, description);
         this.inventory = new HashMap<String, Artefact>();
     }
+
+    public Map<String, Artefact> getInventory() {
+        return this.inventory;
+    }
 }
