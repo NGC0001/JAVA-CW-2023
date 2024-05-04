@@ -15,7 +15,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -31,7 +33,7 @@ public final class GameServer {
     public static final String entityTypeCharacter = "characters";
 
     private Map<String, GameEntity> entities;
-    private Map<String, Command> commands;
+    private List<Command> commands;
     private Map<String, Player> players;
 
     public static void main(String[] args) throws IOException {
@@ -50,7 +52,7 @@ public final class GameServer {
     */
     public GameServer(File entitiesFile, File actionsFile) {
         this.entities = new HashMap<String, GameEntity>();
-        this.commands = new HashMap<String, Command>();
+        this.commands = new ArrayList<Command>();
         this.players = new HashMap<String, Player>();
         loadEntitiesFromFile(entitiesFile);
         loadActionsFromFile(actionsFile);
@@ -173,8 +175,24 @@ public final class GameServer {
     * @param command The incoming command to be processed
     */
     public String handleCommand(String command) {
-        // TODO implement your server logic here
-        return "";
+        List<String> userCommand = Arrays.asList(command.split(" "));
+        Task matchedTask = null;
+        try {
+            for (Command cmd : this.commands) {
+                Task task = cmd.buildTask(null, userCommand, this.entities);
+                if (task == null) { continue; }
+                if (matchedTask != null) {
+                    throw new GameException.AmbiguousCommandException();
+                }
+                matchedTask = task;
+            }
+            if (matchedTask == null) {
+                throw new GameException.NoMatchingCommandException();
+            }
+            return matchedTask.run();
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
     }
 
     /**

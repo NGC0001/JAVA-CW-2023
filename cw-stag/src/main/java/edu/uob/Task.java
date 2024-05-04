@@ -2,5 +2,5 @@ package edu.uob;
 
 @FunctionalInterface
 public interface Task {
-    void run();
+    public String run() throws GameException;
 }
