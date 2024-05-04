@@ -1,9 +1,11 @@
 package edu.uob;
 
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-public class GameAction {
+public class GameAction implements Command {
     private Set<String> triggers;
     private Set<String> subjects;
     private Set<String> consumed;
@@ -18,5 +20,10 @@ public class GameAction {
         this.triggers.add(trigger);
         this.subjects.add(subject);
         this.narration = narration;
+    }
+
+    @Override
+    public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
+        return null;
     }
 }

@@ -31,7 +31,7 @@ public final class GameServer {
     public static final String entityTypeCharacter = "characters";
 
     private Map<String, GameEntity> entities;
-    private Map<String, GameAction> actions;
+    private Map<String, Command> commands;
     private Map<String, Player> players;
 
     public static void main(String[] args) throws IOException {
@@ -50,7 +50,7 @@ public final class GameServer {
     */
     public GameServer(File entitiesFile, File actionsFile) {
         this.entities = new HashMap<String, GameEntity>();
-        this.actions = new HashMap<String, GameAction>();
+        this.commands = new HashMap<String, Command>();
         this.players = new HashMap<String, Player>();
         loadEntitiesFromFile(entitiesFile);
         loadActionsFromFile(actionsFile);
