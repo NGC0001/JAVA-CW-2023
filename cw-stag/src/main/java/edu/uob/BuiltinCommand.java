@@ -26,6 +26,11 @@ public enum BuiltinCommand implements Command {
     } 
 
     @Override
+    public String toString() {
+        return name() + this.triggers;
+    }
+
+    @Override
     public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
         if (player == null) {
             return null;

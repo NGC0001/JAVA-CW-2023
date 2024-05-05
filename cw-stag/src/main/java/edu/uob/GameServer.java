@@ -59,6 +59,8 @@ public final class GameServer {
         this.playerBornLocation = null;
         loadEntitiesFromFile(entitiesFile);
         loadActionsFromFile(actionsFile);
+        // printEntities(); // For debug.
+        printCommands(); // For debug.
     }
 
     private void loadEntitiesFromFile(File entitiesFile) {
@@ -75,7 +77,6 @@ public final class GameServer {
         } catch (Exception e) {
             System.err.println("when reading entities file: " + e.toString());
         }
-        // printEntities(); // For debug.
     }
 
     private void parseAllLocationsGraph(Graph allLocationsGraph) {
@@ -165,13 +166,15 @@ public final class GameServer {
         if (narrationNodes.getLength() > 0) {
             narration = narrationNodes.item(0).getTextContent().trim();
         }
-        System.out.println("");
-        System.out.println(triggers);
-        System.out.println(subjects);
-        System.out.println(consumed);
-        System.out.println(produced);
-        System.out.println(narration);
-        System.out.println("");
+        if (triggers.isEmpty()) {
+            return;
+        }
+        // TODO: ensure valid action trigger name
+        GameAction action = new GameAction(triggers, narration)
+                .addSubjects(subjects)
+                .addConsumed(consumed)
+                .addProduced(produced);
+        this.commands.add(action);
     }
 
     private List<String> getTaggedTextList(Element element, String parentTagName, String tagName) {
@@ -212,6 +215,12 @@ public final class GameServer {
                 location.printEntities();
             }
         });
+    }
+
+    public void printCommands() {
+        for (Command cmd : this.commands) {
+            System.out.println(cmd.toString());
+        }
     }
 
     /**
