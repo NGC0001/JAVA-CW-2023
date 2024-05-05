@@ -144,8 +144,11 @@ public final class GameServer {
             NodeList actions = root.getChildNodes();
             // Get the first action (only the odd items are actually actions - 1, 3, 5 etc.)
             for (int i = 0; i < actions.getLength(); ++i) {
-                Element firstAction = (Element) actions.item(i);
-                parseActionElement(firstAction);
+                org.w3c.dom.Node actionNode = actions.item(i);
+                if (actionNode instanceof Element) {
+                    Element action = (Element) actionNode;
+                    parseActionElement(action);
+                }
             }
         } catch (Exception e) {
             System.err.println("when reading actions file: " + e.toString());
@@ -153,9 +156,43 @@ public final class GameServer {
     }
 
     private void parseActionElement(Element actionElement) {
-        Element triggers = (Element) actionElement.getElementsByTagName("triggers").item(0);
-        // Get the first trigger phrase
-        String firstTriggerPhrase = triggers.getElementsByTagName("keyphrase").item(0).getTextContent();
+        List<String> triggers = getTaggedTextList(actionElement, "triggers", "keyphrase");
+        List<String> subjects = getTaggedTextList(actionElement, "subjects", "entity");
+        List<String> consumed = getTaggedTextList(actionElement, "consumed", "entity");
+        List<String> produced = getTaggedTextList(actionElement, "produced", "entity");
+        String narration = "";
+        NodeList narrationNodes = actionElement.getElementsByTagName("narration");
+        if (narrationNodes.getLength() > 0) {
+            narration = narrationNodes.item(0).getTextContent().trim();
+        }
+        System.out.println("");
+        System.out.println(triggers);
+        System.out.println(subjects);
+        System.out.println(consumed);
+        System.out.println(produced);
+        System.out.println(narration);
+        System.out.println("");
+    }
+
+    private List<String> getTaggedTextList(Element element, String parentTagName, String tagName) {
+        List<String> result = new ArrayList<String>();
+        NodeList parantTagNodes = element.getElementsByTagName(parentTagName);
+        for (int iParent = 0; iParent < parantTagNodes.getLength(); ++iParent) {
+            org.w3c.dom.Node parentTagNode = parantTagNodes.item(iParent);
+            if (!(parentTagNode instanceof Element)) {
+                continue;
+            }
+            Element parentTagElement = (Element)parentTagNode;
+            NodeList tagNodes = parentTagElement.getElementsByTagName(tagName);
+            for (int iTag = 0; iTag < tagNodes.getLength(); ++iTag) {
+                String text = tagNodes.item(iTag).getTextContent();
+                if (text == null) {
+                    continue;
+                }
+                result.add(text.trim().toLowerCase());
+            }
+        }
+        return result;
     }
 
     private GameEntity getEntity(String name) {
