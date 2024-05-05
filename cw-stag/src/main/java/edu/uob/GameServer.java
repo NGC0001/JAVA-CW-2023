@@ -89,10 +89,10 @@ public final class GameServer {
         String locationName = locationDetails.getId().getId().toLowerCase();
         String locationDescription = locationDetails.getAttribute("description");
         Location location = new Location(locationName, locationDescription);
+        if (!addEntity(location)) { return; }
         if (this.playerBornLocation == null) {
             this.playerBornLocation = location;
         }
-        if (!addEntity(location)) { return; }
         for (Graph entitiesGraph : locationGraph.getSubgraphs()) {
             String entityType = entitiesGraph.getId().getId().toLowerCase();
             for (Node entityNode : entitiesGraph.getNodes(true)) {
@@ -143,8 +143,10 @@ public final class GameServer {
             Element root = document.getDocumentElement();
             NodeList actions = root.getChildNodes();
             // Get the first action (only the odd items are actually actions - 1, 3, 5 etc.)
-            Element firstAction = (Element) actions.item(1);
-            parseActionElement(firstAction);
+            for (int i = 0; i < actions.getLength(); ++i) {
+                Element firstAction = (Element) actions.item(i);
+                parseActionElement(firstAction);
+            }
         } catch (Exception e) {
             System.err.println("when reading actions file: " + e.toString());
         }

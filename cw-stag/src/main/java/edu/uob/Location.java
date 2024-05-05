@@ -11,28 +11,48 @@ public class Location extends GameEntity {
         this.entities = new HashMap<String, GameEntity>();
     }
 
-    public void addLocatedEntity(LocatedEntity entity) {
-        if (entity == null) { return; }
+    public Map<String, GameEntity> getEntities() {
+        return this.entities;
+    }
+
+    private boolean addEntity(GameEntity entity) {
+        if (entity == null) { return false; }
         this.entities.put(entity.getName(), entity);
-        entity.setLocation(this);
+        return true;
+    }
+
+    private boolean removeEntity(GameEntity entity) {
+        return entity != null && this.entities.remove(entity.getName(), entity);
+    }
+
+    private boolean containsEntity(GameEntity entity) {
+        return entity != null && this.entities.get(entity.getName()) == entity;
+    }
+
+    public void addLocatedEntity(LocatedEntity entity) {
+        if (addEntity(entity)) {
+            entity.setLocation(this);
+        }
     }
 
     public boolean removeLocatedEntity(LocatedEntity entity) {
-        if (entity != null
-                && this.entities.remove(entity.getName(), entity)) {
+        boolean removed = removeEntity(entity);
+        if (removed) {
             entity.setLocation(null);
-            return true;
         }
-        return false;
+        return removed;
     }
 
     public void addPathTo(Location otherLocation) {
-        if (otherLocation == null) { return; }
-        this.entities.put(otherLocation.getName(), otherLocation);
+        addEntity(otherLocation);
     }
 
     public boolean removePathTo(Location otherLocation) {
-        return otherLocation != null && this.entities.remove(otherLocation.getName(), otherLocation);
+        return removeEntity(otherLocation);
+    }
+
+    public boolean hasPathTo(Location destination) {
+        return containsEntity(destination);
     }
 
     public void printEntities() {

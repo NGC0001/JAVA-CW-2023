@@ -7,4 +7,22 @@ public class Artefact extends LocatedEntity {
         super(name, description);
         this.owner = null;
     }
+
+    public Player getOwner() {
+        return this.owner;
+    }
+
+    public void setOwner(Player owner) {
+        if (owner != null) {
+            super.setLocation(null);
+        }
+        this.owner = owner;
+    }
+
+    public void setLocation(Location location) {
+        if (location != null) {
+            this.owner = null;
+        }
+        super.setLocation(location);
+    }
 }

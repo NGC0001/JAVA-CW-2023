@@ -9,6 +9,9 @@ public interface Command {
 
     public static Map<String, GameEntity> matchPlayerCommand(List<String> playerCommand, List<String> triggers,
             Map<String, GameEntity> gameEntities) {
+        if (playerCommand == null || triggers == null || gameEntities == null) {
+            return null;
+        }
         boolean triggerMatched = false;
         Map<String, GameEntity> subjects = new HashMap<String, GameEntity>();
         for (String word : playerCommand) {
