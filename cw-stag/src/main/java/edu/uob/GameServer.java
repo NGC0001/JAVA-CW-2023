@@ -16,9 +16,12 @@ import java.net.Socket;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
@@ -33,7 +36,7 @@ public final class GameServer {
     public static final String entityTypeCharacter = "characters";
 
     private Map<String, GameEntity> entities;
-    private List<Command> commands;
+    private Map<String, List<Command>> commands;
     private Map<String, Player> players;
     private Location playerBornLocation;
 
@@ -53,14 +56,37 @@ public final class GameServer {
     */
     public GameServer(File entitiesFile, File actionsFile) {
         this.entities = new HashMap<String, GameEntity>();
-        this.commands = new ArrayList<Command>();
+        this.commands = new HashMap<String, List<Command>>();
         this.players = new HashMap<String, Player>();
-        this.commands.addAll(Arrays.asList(BuiltinCommand.values()));
         this.playerBornLocation = null;
+        addCommands(BuiltinCommand.values());
         loadEntitiesFromFile(entitiesFile);
         loadActionsFromFile(actionsFile);
         // printEntities(); // For debug.
         printCommands(); // For debug.
+    }
+
+    private void addCommands(Command[] commands) {
+        for (Command command : commands) {
+            addCommand(command);
+        }
+    }
+
+    private boolean addCommand(Command command) {
+        for (String trigger : command.getTriggers()) { // trigger shouldn't be an existing entity name
+            if (this.entities.containsKey(trigger)) {
+                return false;
+            }
+        }
+        for (String trigger : command.getTriggers()) {
+            List<Command> commandList = this.commands.get(trigger);
+            if (commandList == null) {
+                commandList = new ArrayList<Command>();
+                this.commands.put(trigger, commandList);
+            }
+            commandList.add(command);
+        }
+        return true;
     }
 
     private void loadEntitiesFromFile(File entitiesFile) {
@@ -100,7 +126,7 @@ public final class GameServer {
                 String entityName = entityNode.getId().getId().toLowerCase();
                 String entityDescription = entityNode.getAttribute("description");
                 LocatedEntity entity = createLocatedEntity(entityType, entityName, entityDescription);
-                if (addEntity(entity)) {
+                if (entity != null && addEntity(entity)) {
                     location.addLocatedEntity(entity);
                 }
             }
@@ -158,23 +184,30 @@ public final class GameServer {
 
     private void parseActionElement(Element actionElement) {
         List<String> triggers = getTaggedTextList(actionElement, "triggers", "keyphrase");
-        List<String> subjects = getTaggedTextList(actionElement, "subjects", "entity");
-        List<String> consumed = getTaggedTextList(actionElement, "consumed", "entity");
-        List<String> produced = getTaggedTextList(actionElement, "produced", "entity");
+        if (triggers.isEmpty() || duplicateInList(triggers)) {
+            // no trigger, or duplicate triggers
+            return;
+        }
+        List<String> subjectsNames = getTaggedTextList(actionElement, "subjects", "entity");
+        List<String> consumedNames = getTaggedTextList(actionElement, "consumed", "entity");
+        List<String> producedNames = getTaggedTextList(actionElement, "produced", "entity");
+        if (duplicateInList(subjectsNames) || duplicateInList(consumedNames) || duplicateInList(producedNames)) {
+            return;
+        }
+        List<GameEntity> subjects = getEntities(subjectsNames);
+        List<GameEntity> consumed = getEntities(consumedNames);
+        List<GameEntity> produced = getEntities(producedNames);
+        if (subjects == null || consumed == null || produced == null) {
+            // entities specified by the action do not exist
+            return;
+        }
         String narration = "";
         NodeList narrationNodes = actionElement.getElementsByTagName("narration");
         if (narrationNodes.getLength() > 0) {
             narration = narrationNodes.item(0).getTextContent().trim();
         }
-        if (triggers.isEmpty()) {
-            return;
-        }
-        // TODO: ensure valid action trigger name
-        GameAction action = new GameAction(triggers, narration)
-                .addSubjects(subjects)
-                .addConsumed(consumed)
-                .addProduced(produced);
-        this.commands.add(action);
+        GameAction action = new GameAction(triggers, subjects, consumed, produced, narration);
+        addCommand(action);
     }
 
     private List<String> getTaggedTextList(Element element, String parentTagName, String tagName) {
@@ -198,14 +231,33 @@ public final class GameServer {
         return result;
     }
 
+    private static <T> boolean duplicateInList(Collection<T> list) {
+        Set<T> set = new HashSet<T>(list);
+        return set.size() < list.size();
+    }
+
+    private List<GameEntity> getEntities(Collection<? extends String> names) {
+        List<GameEntity> entities = new ArrayList<GameEntity>();
+        for (String name : names) {
+            GameEntity entity = getEntity(name);
+            if (entity == null) {
+                return null;
+            }
+            entities.add(entity);
+        }
+        return entities;
+    }
+
     private GameEntity getEntity(String name) {
         return this.entities.get(name);
     }
 
-    // TODO: ensure valid entity name
     private boolean addEntity(GameEntity entity) {
-        if (entity == null) { return false; }
-        return this.entities.putIfAbsent(entity.getName(), entity) == null;
+        String entityName = entity.getName();
+        if (this.commands.containsKey(entityName)) { // entity name shouldn't be an existing trigger
+            return false;
+        }
+        return this.entities.putIfAbsent(entityName, entity) == null; // entity name should be unique
     }
 
     public void printEntities() {
@@ -218,9 +270,12 @@ public final class GameServer {
     }
 
     public void printCommands() {
-        for (Command cmd : this.commands) {
-            System.out.println(cmd.toString());
-        }
+        this.commands.forEach((name, commandList) -> {
+            System.out.println(name);
+            for (Command command : commandList) {
+                System.out.println("    " + command.toString());
+            }
+        });
     }
 
     /**
