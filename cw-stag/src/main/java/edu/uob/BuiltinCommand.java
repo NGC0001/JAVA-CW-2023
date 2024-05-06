@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 public enum BuiltinCommand implements Command {
+    // triggers must be unique and in lower case.
     INV(BuiltinCommand::buildInvTask, "inventory", "inv"),
     GET(BuiltinCommand::buildGetTask, "get"),
     DROP(BuiltinCommand::buildDropTask, "drop"),
@@ -24,6 +25,11 @@ public enum BuiltinCommand implements Command {
         this.builder = builder;
         this.triggers = Arrays.asList(triggers);
     } 
+
+    @Override
+    public List<String> getTriggers() {
+        return this.triggers;
+    }
 
     @Override
     public String toString() {

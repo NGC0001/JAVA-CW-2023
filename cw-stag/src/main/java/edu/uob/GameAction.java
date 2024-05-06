@@ -1,51 +1,63 @@
 package edu.uob;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class GameAction implements Command {
-    private Set<String> triggers;
-    private Set<String> subjects;
-    private Set<String> consumed;
-    private Set<String> produced;
+    private List<String> triggers;
+    private List<GameEntity> subjects;
+    private List<GameEntity> consumed;
+    private List<GameEntity> produced;
     private String narration;
 
-    public GameAction(List<String> triggers, String narration) {
-        this.triggers = new HashSet<String>();
-        this.subjects = new HashSet<String>();
-        this.consumed = new HashSet<String>();
-        this.produced = new HashSet<String>();
-        this.triggers.addAll(triggers);
+    public GameAction(List<String> triggers, List<GameEntity> subjects,
+            List<GameEntity> consumed, List<GameEntity> produced, String narration) {
+        this.triggers = triggers;
+        this.subjects = subjects;
+        this.consumed = consumed;
+        this.produced = produced;
         this.narration = narration;
     }
 
-    public GameAction addSubjects(Collection<? extends String> entities) {
-        this.subjects.addAll(entities);
-        return this;
-    }
-
-    public GameAction addConsumed(Collection<? extends String> entities) {
-        this.consumed.addAll(entities);
-        return this;
-    }
-
-    public GameAction addProduced(Collection<? extends String> entities) {
-        this.produced.addAll(entities);
-        return this;
+    @Override
+    public List<String> getTriggers() {
+        return this.triggers;
     }
 
     @Override
     public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
-        Map<String, GameEntity> matchedSubjects = Command.matchPlayerCommand(playerCommand,
-                new ArrayList<String>(this.triggers), gameEntities);
-        if (matchedSubjects == null) {
+        Map<String, GameEntity> matchedSubjects = Command.matchPlayerCommand(
+                playerCommand, this.triggers, gameEntities);
+        if (matchedSubjects == null || matchedSubjects.isEmpty()) {
             return null;
         }
-        return null;
+        for (GameEntity entity : matchedSubjects.values()) {
+            if (!this.subjects.contains(entity.getName())) {
+                return null;
+            }
+        }
+        for (String entityName : this.subjects) {
+            GameEntity entity = gameEntities.get(entityName);
+            if (entity == null) {
+                return null;
+            }
+            if (!player.getLocation().getEntities().containsKey(entity.getName())) {
+                if (!(entity instanceof Artefact)) {
+                    return null;
+                }
+                Artefact artefact = (Artefact)entity;
+                if (artefact.getOwner() != player) {
+                    return null;
+                }
+            }
+        }
+        return new Task() {
+            @Override
+            public String run() {
+                return "";
+            }
+        };
     }
 
     @Override
