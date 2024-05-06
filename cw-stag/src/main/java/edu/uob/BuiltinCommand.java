@@ -65,25 +65,21 @@ public enum BuiltinCommand implements Command {
             return null;
         }
         GameEntity subject = subjects.values().iterator().next();
+        if (!(subject instanceof Artefact)) {
+            return null;
+        }
+        Artefact artefact = (Artefact) subject;
+        if (player.getLocation() != artefact.getLocation()) {
+            return null;
+        }
         return new Task() {
             @Override
-            public String run() throws GameException {
-                if (!(subject instanceof Artefact)) {
-                    throw new GameException.CommandFailureException(subject.getName() + " is not an artifect");
+            public String run() {
+                if (player.getLocation().removeLocatedEntity(artefact)) {
+                    player.addArtefact(artefact);
+                    return "";
                 }
-                Artefact artefact = (Artefact)subject;
-                if (!player.getLocation().removeLocatedEntity(artefact)) {
-                    String artefactPosition = null;
-                    if (artefact.getLocation() == null) {
-                        artefactPosition = "on " + artefact.getOwner().getName();
-                    } else {
-                        artefactPosition = "at " + artefact.getLocation().getName();
-                    }
-                    throw new GameException.CommandFailureException(artefact.getName() + " is " + artefactPosition
-                            + ", not at " + player.getLocation().getName());
-                }
-                player.addArtefact(artefact);
-                return "";
+                return "Error"; // shall never hapen
             }
         };
     }
@@ -93,19 +89,21 @@ public enum BuiltinCommand implements Command {
             return null;
         }
         GameEntity subject = subjects.values().iterator().next();
+        if (!(subject instanceof Artefact)) {
+            return null;
+        }
+        Artefact artefact = (Artefact) subject;
+        if (artefact.getOwner() != player) {
+            return null;
+        }
         return new Task() {
             @Override
-            public String run() throws GameException {
-                if (!(subject instanceof Artefact)) {
-                    throw new GameException.CommandFailureException(subject.getName() + " is not an artifect");
+            public String run() {
+                if (player.removeArtefact(artefact)) {
+                    player.getLocation().addLocatedEntity(artefact);
+                    return "";
                 }
-                Artefact artefact = (Artefact)subject;
-                if (!player.removeArtefact(artefact)) {
-                    throw new GameException.CommandFailureException(artefact.getName() + " is not on "
-                            + player.getName());
-                }
-                player.getLocation().addLocatedEntity(artefact);
-                return "";
+                return "Error"; // shall never hapen
             }
         };
     }
@@ -115,17 +113,16 @@ public enum BuiltinCommand implements Command {
             return null;
         }
         GameEntity subject = subjects.values().iterator().next();
+        if (!(subject instanceof Location)) {
+            return null;
+        }
+        Location destination = (Location) subject;
+        if (!player.getLocation().hasPathTo(destination)) {
+            return null;
+        }
         return new Task() {
             @Override
-            public String run() throws GameException {
-                if (!(subject instanceof Location)) {
-                    throw new GameException.CommandFailureException(subject.getName() + " is not a location");
-                }
-                Location destination = (Location)subject;
-                if (!player.getLocation().hasPathTo(destination)) {
-                    throw new GameException.CommandFailureException(player.getLocation().getName() + " has no path to "
-                            + destination.getName());
-                }
+            public String run() {
                 player.getLocation().removeLocatedEntity(player);
                 destination.addLocatedEntity(player);
                 return "";
@@ -142,7 +139,8 @@ public enum BuiltinCommand implements Command {
 
             @Override
             public String run() {
-                this.result = "";
+                Location location = player.getLocation();
+                this.result = location.getName() + " : " + location.getDescription() + "\n";
                 player.getLocation().getEntities().forEach((name, entity) -> {
                     if (entity != player) {
                         this.result += name + " : " + entity.getDescription() + "\n";

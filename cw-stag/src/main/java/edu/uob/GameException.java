@@ -36,13 +36,4 @@ public abstract class GameException extends Exception {
             super("no matching command found");
         }
     }
-
-    public static class CommandFailureException extends GameException {
-        @Serial
-        private static final long serialVersionUID = 1;
-
-        public CommandFailureException(String message) {
-            super(message);
-        }
-    }
 }

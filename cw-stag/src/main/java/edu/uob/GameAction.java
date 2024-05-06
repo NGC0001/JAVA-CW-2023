@@ -1,5 +1,6 @@
 package edu.uob;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +40,11 @@ public class GameAction implements Command {
 
     @Override
     public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
+        Map<String, GameEntity> matchedSubjects = Command.matchPlayerCommand(playerCommand,
+                new ArrayList<String>(this.triggers), gameEntities);
+        if (matchedSubjects == null) {
+            return null;
+        }
         return null;
     }
 
