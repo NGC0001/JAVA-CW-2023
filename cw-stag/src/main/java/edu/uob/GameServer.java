@@ -34,6 +34,7 @@ public final class GameServer {
     private static final String entityTypeArtefact = "artefacts";
     private static final String entityTypeFurniture = "furniture";
     private static final String entityTypeCharacter = "characters";
+    private static final String defaultLocationName = "storeroom";
 
     private Map<String, GameEntity> entities;
     private Map<String, List<Command>> commands;
@@ -60,8 +61,14 @@ public final class GameServer {
         this.players = new HashMap<String, Player>();
         this.playerBornLocation = null;
         addCommands(BuiltinCommand.values());
-        loadEntitiesFromFile(entitiesFile);
+        loadEntitiesFromFile(entitiesFile); // shall set player born location
         loadActionsFromFile(actionsFile);
+        if (!this.entities.containsKey(defaultLocationName)) { // ensures default location exists
+            addEntity(new Location(defaultLocationName, ""));
+        }
+        if (this.playerBornLocation == null) {
+            this.playerBornLocation = (Location)this.entities.get(defaultLocationName);
+        }
         // printEntities(); // For debug.
         printCommands(); // For debug.
     }
@@ -73,8 +80,11 @@ public final class GameServer {
     }
 
     private boolean addCommand(Command command) {
-        for (String trigger : command.getTriggers()) { // trigger shouldn't be an existing entity name
-            if (this.entities.containsKey(trigger)) {
+        for (String trigger : command.getTriggers()) {
+            if (this.entities.containsKey(trigger)) { // trigger shouldn't be an existing entity name
+                return false;
+            }
+            if (defaultLocationName.equals(trigger)) {
                 return false;
             }
         }
@@ -254,6 +264,9 @@ public final class GameServer {
 
     private boolean addEntity(GameEntity entity) {
         String entityName = entity.getName();
+        if (defaultLocationName.equals(entityName) && !(entity instanceof Location)) {
+            return false;
+        }
         if (this.commands.containsKey(entityName)) { // entity name shouldn't be an existing trigger
             return false;
         }
