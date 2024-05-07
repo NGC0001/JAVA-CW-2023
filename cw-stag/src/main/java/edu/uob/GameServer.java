@@ -35,10 +35,12 @@ public final class GameServer {
     private static final String entityTypeFurniture = "furniture";
     private static final String entityTypeCharacter = "characters";
     private static final String defaultLocationName = "storeroom";
+    private static final String healthKeyword = "health";
 
     private Map<String, GameEntity> entities;
     private Map<String, List<Command>> commands;
     private Map<String, Player> players;
+    private Location entityDefaultLocation;
     private Location playerBornLocation;
 
     public static void main(String[] args) throws IOException {
@@ -63,13 +65,16 @@ public final class GameServer {
         addCommands(BuiltinCommand.values());
         loadEntitiesFromFile(entitiesFile); // shall set player born location
         loadActionsFromFile(actionsFile);
-        if (!this.entities.containsKey(defaultLocationName)) { // ensures default location exists
-            addEntity(new Location(defaultLocationName, ""));
+        this.entityDefaultLocation = (Location)this.entities.get(defaultLocationName);
+        if (this.entityDefaultLocation == null) {
+            // ensures default location exists
+            this.entityDefaultLocation = new Location(defaultLocationName, "fallback");
+            addEntity(this.entityDefaultLocation);
         }
         if (this.playerBornLocation == null) {
-            this.playerBornLocation = (Location)this.entities.get(defaultLocationName);
+            this.playerBornLocation = this.entityDefaultLocation;
         }
-        // printEntities(); // For debug.
+        printEntities(); // For debug.
         printCommands(); // For debug.
     }
 
@@ -81,10 +86,10 @@ public final class GameServer {
 
     private boolean addCommand(Command command) {
         for (String trigger : command.getTriggers()) {
-            if (this.entities.containsKey(trigger)) { // trigger shouldn't be an existing entity name
+            if (defaultLocationName.equals(trigger)) {
                 return false;
             }
-            if (defaultLocationName.equals(trigger)) {
+            if (this.entities.containsKey(trigger)) { // trigger shouldn't be an existing entity name
                 return false;
             }
         }
@@ -320,7 +325,7 @@ public final class GameServer {
             if (matchedTask == null) {
                 throw new GameException.NoMatchingCommandException();
             }
-            return matchedTask.run();
+            return matchedTask.run(this.entityDefaultLocation, this.playerBornLocation);
         } catch (Exception e) {
             return "Error: " + e.getMessage();
         }

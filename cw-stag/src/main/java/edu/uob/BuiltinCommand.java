@@ -51,7 +51,7 @@ public enum BuiltinCommand implements Command {
             private String result;
 
             @Override
-            public String run() {
+            public String run(Location entityDefaultLocation, Location playerBornLocation) {
                 this.result = "";
                 player.getInventory().forEach((name, artefact) -> {
                     this.result += name + "\n";
@@ -73,15 +73,12 @@ public enum BuiltinCommand implements Command {
         if (player.getLocation() != artefact.getLocation()) {
             return null;
         }
-        return new Task() {
-            @Override
-            public String run() {
-                if (player.getLocation().removeLocatedEntity(artefact)) {
-                    player.addArtefact(artefact);
-                    return "";
-                }
-                return "Error"; // shall never hapen
+        return (entityDefaultLocation, playerBornLocation) -> {
+            if (player.getLocation().removeLocatedEntity(artefact)) {
+                player.addArtefact(artefact);
+                return "";
             }
+            return "Error"; // shall never hapen
         };
     }
 
@@ -97,15 +94,12 @@ public enum BuiltinCommand implements Command {
         if (artefact.getOwner() != player) {
             return null;
         }
-        return new Task() {
-            @Override
-            public String run() {
-                if (player.removeArtefact(artefact)) {
-                    player.getLocation().addLocatedEntity(artefact);
-                    return "";
-                }
-                return "Error"; // shall never hapen
+        return (entityDefaultLocation, playerBornLocation) -> {
+            if (player.removeArtefact(artefact)) {
+                player.getLocation().addLocatedEntity(artefact);
+                return "";
             }
+            return "Error"; // shall never hapen
         };
     }
 
@@ -121,13 +115,10 @@ public enum BuiltinCommand implements Command {
         if (!player.getLocation().hasPathTo(destination)) {
             return null;
         }
-        return new Task() {
-            @Override
-            public String run() {
-                player.getLocation().removeLocatedEntity(player);
-                destination.addLocatedEntity(player);
-                return "";
-            }
+        return (entityDefaultLocation, playerBornLocation) -> {
+            player.getLocation().removeLocatedEntity(player);
+            destination.addLocatedEntity(player);
+            return "";
         };
     }
 
@@ -139,7 +130,7 @@ public enum BuiltinCommand implements Command {
             private String result;
 
             @Override
-            public String run() {
+            public String run(Location entityDefaultLocation, Location playerBornLocation) {
                 Location location = player.getLocation();
                 this.result = location.getName() + " : " + location.getDescription() + "\n";
                 player.getLocation().getEntities().forEach((name, entity) -> {
@@ -156,11 +147,6 @@ public enum BuiltinCommand implements Command {
         if (!subjects.isEmpty()) {
             return null;
         }
-        return new Task() {
-            @Override
-            public String run() {
-                return String.valueOf(player.getHealth());
-            }
-        };
+        return (entityDefaultLocation, playerBornLocation) -> String.valueOf(player.getHealth());
     }
 }

@@ -2,5 +2,5 @@ package edu.uob;
 
 @FunctionalInterface
 public interface Task {
-    public String run();
+    public String run(Location entityDefaultLocation, Location playerBornLocation);
 }

@@ -45,12 +45,24 @@ public class GameAction implements Command {
                 }
             }
         }
-        return new Task() {
-            @Override
-            public String run() {
-                return "";
+        // TODO:
+        // NOT possible to perform an action if subject/consumed/produced entity in another player's inventory
+        // NOT possible to consume/produce current location
+        // trigger phrases, rather than single word
+        // punctuation: make drink with tee, sugar
+        return (entityDefaultLocation, playerBornLocation) -> {
+            for (GameEntity entity : consumed) {
+                consumeEntity(entity);
             }
+            for (GameEntity entity : produced) {
+                produceEntity(entity);
+            }
+            return "";
         };
+    }
+
+    private static void consumeEntity(GameEntity entity) {
+        if (entity instanceof Location) {}
     }
 
     @Override
