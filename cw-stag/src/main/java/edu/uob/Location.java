@@ -43,6 +43,10 @@ public class Location extends GameEntity {
         return removed;
     }
 
+    public boolean containsLocatedEntity(LocatedEntity entity) {
+        return containsEntity(entity);
+    }
+
     public void addPathTo(Location otherLocation) {
         addEntity(otherLocation);
     }
@@ -51,8 +55,18 @@ public class Location extends GameEntity {
         return removeEntity(otherLocation);
     }
 
-    public boolean hasPathTo(Location destination) {
+    public boolean hasPathToLocation(Location destination) {
         return containsEntity(destination);
+    }
+
+    public boolean containsOrHasPathTo(GameEntity entity) {
+        if (entity instanceof LocatedEntity) {
+            return containsLocatedEntity((LocatedEntity)entity);
+        }
+        if (entity instanceof Location) {
+            return hasPathToLocation((Location)entity);
+        }
+        return false;
     }
 
     public void printEntities() {

@@ -33,6 +33,14 @@ public class Player extends Character {
         return false;
     }
 
+    public boolean ownsArtefact(Artefact artefact) {
+        return artefact != null && this.inventory.get(artefact.getName()) == artefact;
+    }
+
+    public boolean ownsEntity(GameEntity entity) {
+        return (entity instanceof Artefact) && ownsArtefact((Artefact)entity);
+    }
+
     public int getHealth() {
         return this.health;
     }

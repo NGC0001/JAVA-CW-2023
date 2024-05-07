@@ -198,20 +198,20 @@ public final class GameServer {
     }
 
     private void parseActionElement(Element actionElement) {
-        List<String> triggers = getTaggedTextList(actionElement, "triggers", "keyphrase");
-        if (triggers.isEmpty() || duplicateInList(triggers)) {
-            // no trigger, or duplicate triggers
+        List<String> triggersList = getTaggedTextList(actionElement, "triggers", "keyphrase");
+        Set<String> triggersSet = new HashSet<String>(triggersList);
+        List<String> triggers = new ArrayList<String>(triggersSet);
+        if (triggersSet.isEmpty()) {
             return;
         }
         List<String> subjectsNames = getTaggedTextList(actionElement, "subjects", "entity");
         List<String> consumedNames = getTaggedTextList(actionElement, "consumed", "entity");
         List<String> producedNames = getTaggedTextList(actionElement, "produced", "entity");
-        if (duplicateInList(subjectsNames) || duplicateInList(consumedNames) || duplicateInList(producedNames)) {
-            return;
-        }
-        List<GameEntity> subjects = getEntitiesByNames(subjectsNames);
-        List<GameEntity> consumed = getEntitiesByNames(consumedNames);
-        List<GameEntity> produced = getEntitiesByNames(producedNames);
+        int consumedHealth = pickoutStringFromList(consumedNames, healthKeyword);
+        int producedHealth = pickoutStringFromList(producedNames, healthKeyword);
+        List<GameEntity> subjects = getEntitiesByNames(new HashSet<String>(subjectsNames));
+        List<GameEntity> consumed = getEntitiesByNames(new HashSet<String>(consumedNames));
+        List<GameEntity> produced = getEntitiesByNames(new HashSet<String>(producedNames));
         if (subjects == null || consumed == null || produced == null) {
             // entities specified by the action do not exist
             return;
@@ -221,7 +221,9 @@ public final class GameServer {
         if (narrationNodes.getLength() > 0) {
             narration = narrationNodes.item(0).getTextContent().trim();
         }
-        GameAction action = new GameAction(triggers, subjects, consumed, produced, narration);
+        GameAction action = new GameAction(triggers, subjects, narration);
+        action.setConsumed(consumed, consumedHealth);
+        action.setProduced(produced, producedHealth);
         addCommand(action);
     }
 
@@ -246,9 +248,18 @@ public final class GameServer {
         return result;
     }
 
-    private static <T> boolean duplicateInList(Collection<T> list) {
-        Set<T> set = new HashSet<T>(list);
-        return set.size() < list.size();
+    private static int pickoutStringFromList(List<String> list, String word) {
+        int i = 0;
+        int cnt = 0;
+        while (i < list.size()) {
+            if (word.equals(list.get(i))) {
+                list.remove(i);
+                ++cnt;
+            } else {
+                ++i;
+            }
+        }
+        return cnt;
     }
 
     private List<GameEntity> getEntitiesByNames(Collection<String> names) {
@@ -269,6 +280,9 @@ public final class GameServer {
 
     private boolean addEntity(GameEntity entity) {
         String entityName = entity.getName();
+        if (healthKeyword.equals(entityName)) {
+            return false;
+        }
         if (defaultLocationName.equals(entityName) && !(entity instanceof Location)) {
             return false;
         }

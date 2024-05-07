@@ -112,7 +112,7 @@ public enum BuiltinCommand implements Command {
             return null;
         }
         Location destination = (Location) subject;
-        if (!player.getLocation().hasPathTo(destination)) {
+        if (!player.getLocation().hasPathToLocation(destination)) {
             return null;
         }
         return (entityDefaultLocation, playerBornLocation) -> {
