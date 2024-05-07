@@ -31,9 +31,9 @@ import org.w3c.dom.NodeList;
 public final class GameServer {
 
     private static final char END_OF_TRANSMISSION = 4;
-    public static final String entityTypeArtefact = "artefacts";
-    public static final String entityTypeFurniture = "furniture";
-    public static final String entityTypeCharacter = "characters";
+    private static final String entityTypeArtefact = "artefacts";
+    private static final String entityTypeFurniture = "furniture";
+    private static final String entityTypeCharacter = "characters";
 
     private Map<String, GameEntity> entities;
     private Map<String, List<Command>> commands;
@@ -194,9 +194,9 @@ public final class GameServer {
         if (duplicateInList(subjectsNames) || duplicateInList(consumedNames) || duplicateInList(producedNames)) {
             return;
         }
-        List<GameEntity> subjects = getEntities(subjectsNames);
-        List<GameEntity> consumed = getEntities(consumedNames);
-        List<GameEntity> produced = getEntities(producedNames);
+        List<GameEntity> subjects = getEntitiesByNames(subjectsNames);
+        List<GameEntity> consumed = getEntitiesByNames(consumedNames);
+        List<GameEntity> produced = getEntitiesByNames(producedNames);
         if (subjects == null || consumed == null || produced == null) {
             // entities specified by the action do not exist
             return;
@@ -236,7 +236,7 @@ public final class GameServer {
         return set.size() < list.size();
     }
 
-    private List<GameEntity> getEntities(Collection<? extends String> names) {
+    private List<GameEntity> getEntitiesByNames(Collection<String> names) {
         List<GameEntity> entities = new ArrayList<GameEntity>();
         for (String name : names) {
             GameEntity entity = getEntity(name);
@@ -270,11 +270,12 @@ public final class GameServer {
     }
 
     public void printCommands() {
-        this.commands.forEach((name, commandList) -> {
-            System.out.println(name);
-            for (Command command : commandList) {
-                System.out.println("    " + command.toString());
-            }
+        Set<Command> commandSet = new HashSet<Command>();
+        this.commands.values().forEach((commandList) -> {
+            commandSet.addAll(commandList);
+        });
+        commandSet.forEach((command) -> {
+            System.out.println(command.toString());
         });
     }
 
@@ -293,9 +294,10 @@ public final class GameServer {
             String playerName = playerNameAndCommand[0].trim();
             Player player = getOrCreatePlayer(playerName);
             List<String> playerCommand = Arrays.asList(playerNameAndCommand[1].trim().split("\\s+"));
+            List<GameEntity> subjects = getSubjectsFromPlayerCommand(playerCommand);
             Task matchedTask = null;
-            for (Command cmd : this.commands) {
-                Task task = cmd.buildTask(player, playerCommand, this.entities);
+            for (Command cmd : getCandidateCommandsFromPlayerCommand(playerCommand)) {
+                Task task = cmd.buildTask(player, subjects);
                 if (task == null) { continue; }
                 if (matchedTask != null) {
                     throw new GameException.AmbiguousCommandException();
@@ -320,6 +322,28 @@ public final class GameServer {
         this.players.put(playerName, player);
         this.playerBornLocation.addLocatedEntity(player);
         return player;
+    }
+
+    private List<GameEntity> getSubjectsFromPlayerCommand(Collection<String> playerCommand) {
+        List<GameEntity> entities = new ArrayList<GameEntity>();
+        for (String name : new HashSet<String>(playerCommand)) {
+            GameEntity entity = getEntity(name);
+            if (entity != null) {
+                entities.add(entity);
+            }
+        }
+        return entities;
+    }
+
+    private Set<Command> getCandidateCommandsFromPlayerCommand(Collection<String> playerCommand) {
+        Set<Command> candidateCommands = new HashSet<Command>();
+        for (String trigger : playerCommand) {
+            List<Command> commands = this.commands.get(trigger);
+            if (commands != null) {
+                candidateCommands.addAll(commands);
+            }
+        }
+        return candidateCommands;
     }
 
     /**

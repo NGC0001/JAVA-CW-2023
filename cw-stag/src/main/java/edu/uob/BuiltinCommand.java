@@ -2,7 +2,6 @@ package edu.uob;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 public enum BuiltinCommand implements Command {
     // triggers must be unique and in lower case.
@@ -15,7 +14,7 @@ public enum BuiltinCommand implements Command {
 
     @FunctionalInterface
     private interface TaskBuilder {
-        public Task buildTaskFromSubjects(Player player, Map<String, GameEntity> subjects);
+        public Task buildTaskFromSubjects(Player player, List<GameEntity> subjects);
     }
 
     private TaskBuilder builder;
@@ -37,18 +36,14 @@ public enum BuiltinCommand implements Command {
     }
 
     @Override
-    public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
-        if (player == null) {
-            return null;
-        }
-        Map<String, GameEntity> subjects = Command.matchPlayerCommand(playerCommand, this.triggers, gameEntities);
-        if (subjects == null) {
+    public Task buildTask(Player player, List<GameEntity> subjects) {
+        if (player == null || subjects == null) {
             return null;
         }
         return this.builder.buildTaskFromSubjects(player, subjects);
     }
 
-    private static Task buildInvTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildInvTask(Player player, List<GameEntity> subjects) {
         if (!subjects.isEmpty()) {
             return null;
         }
@@ -66,11 +61,11 @@ public enum BuiltinCommand implements Command {
         };
     }
 
-    private static Task buildGetTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildGetTask(Player player, List<GameEntity> subjects) {
         if (subjects.size() != 1) {
             return null;
         }
-        GameEntity subject = subjects.values().iterator().next();
+        GameEntity subject = subjects.get(0);
         if (!(subject instanceof Artefact)) {
             return null;
         }
@@ -90,11 +85,11 @@ public enum BuiltinCommand implements Command {
         };
     }
 
-    private static Task buildDropTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildDropTask(Player player, List<GameEntity> subjects) {
         if (subjects.size() != 1) {
             return null;
         }
-        GameEntity subject = subjects.values().iterator().next();
+        GameEntity subject = subjects.get(0);
         if (!(subject instanceof Artefact)) {
             return null;
         }
@@ -114,11 +109,11 @@ public enum BuiltinCommand implements Command {
         };
     }
 
-    private static Task buildGotoTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildGotoTask(Player player, List<GameEntity> subjects) {
         if (subjects.size() != 1) {
             return null;
         }
-        GameEntity subject = subjects.values().iterator().next();
+        GameEntity subject = subjects.get(0);
         if (!(subject instanceof Location)) {
             return null;
         }
@@ -136,7 +131,7 @@ public enum BuiltinCommand implements Command {
         };
     }
 
-    private static Task buildLookTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildLookTask(Player player, List<GameEntity> subjects) {
         if (!subjects.isEmpty()) {
             return null;
         }
@@ -157,7 +152,7 @@ public enum BuiltinCommand implements Command {
         };
     }
 
-    private static Task buildHealthTask(Player player, Map<String, GameEntity> subjects) {
+    private static Task buildHealthTask(Player player, List<GameEntity> subjects) {
         if (!subjects.isEmpty()) {
             return null;
         }

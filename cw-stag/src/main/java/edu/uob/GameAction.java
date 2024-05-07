@@ -1,8 +1,7 @@
 package edu.uob;
 
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 public class GameAction implements Command {
     private List<String> triggers;
@@ -26,27 +25,21 @@ public class GameAction implements Command {
     }
 
     @Override
-    public Task buildTask(Player player, List<String> playerCommand, Map<String, GameEntity> gameEntities) {
-        Map<String, GameEntity> matchedSubjects = Command.matchPlayerCommand(
-                playerCommand, this.triggers, gameEntities);
-        if (matchedSubjects == null || matchedSubjects.isEmpty()) {
+    public Task buildTask(Player player, List<GameEntity> subjects) {
+        if (player == null || subjects == null || subjects.isEmpty()) {
             return null;
         }
-        for (GameEntity entity : matchedSubjects.values()) {
-            if (!this.subjects.contains(entity.getName())) {
+        for (GameEntity subject : subjects) { // check extraneous subject
+            if (!this.subjects.contains(subject)) { // be careful here, no type checking
                 return null;
             }
         }
-        for (String entityName : this.subjects) {
-            GameEntity entity = gameEntities.get(entityName);
-            if (entity == null) {
-                return null;
-            }
-            if (!player.getLocation().getEntities().containsKey(entity.getName())) {
-                if (!(entity instanceof Artefact)) {
+        for (GameEntity subject : this.subjects) {
+            if (!player.getLocation().getEntities().containsKey(subject.getName())) {
+                if (!(subject instanceof Artefact)) {
                     return null;
                 }
-                Artefact artefact = (Artefact)entity;
+                Artefact artefact = (Artefact)subject;
                 if (artefact.getOwner() != player) {
                     return null;
                 }
@@ -62,7 +55,10 @@ public class GameAction implements Command {
 
     @Override
     public String toString() {
-        return "ACTION" + this.triggers + this.subjects + this.consumed + this.produced
+        return "ACTION" + this.triggers
+                + this.subjects.stream().map(e -> e.getName()).collect(Collectors.toList())
+                + this.consumed.stream().map(e -> e.getName()).collect(Collectors.toList())
+                + this.produced.stream().map(e -> e.getName()).collect(Collectors.toList())
                 + "(" + this.narration + ")";
     }
 }
