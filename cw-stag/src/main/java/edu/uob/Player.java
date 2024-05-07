@@ -5,6 +5,7 @@ import java.util.Map;
 
 public class Player extends Character {
     private static final int maxPlayerHealth = 3;
+
     private Map<String, Artefact> inventory;
     private int health;
 
@@ -33,6 +34,13 @@ public class Player extends Character {
         return false;
     }
 
+    public void dropInventory() {
+        this.inventory.values().forEach((artefact) ->{
+            artefact.setOwner(null);
+            getLocation().addLocatedEntity(artefact);
+        });
+    }
+
     public boolean ownsArtefact(Artefact artefact) {
         return artefact != null && this.inventory.get(artefact.getName()) == artefact;
     }
@@ -43,5 +51,17 @@ public class Player extends Character {
 
     public int getHealth() {
         return this.health;
+    }
+
+    public void increaseHealth(int inc) {
+        this.health = Math.min(this.health + inc, maxPlayerHealth);
+    }
+
+    public void decreaseHealth(int inc) {
+        this.health = Math.max(this.health - inc, 0);
+    }
+
+    public void resetHealth() {
+        this.health = maxPlayerHealth;
     }
 }

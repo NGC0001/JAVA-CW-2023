@@ -53,9 +53,17 @@ public class GameAction implements Command {
             return null;
         }
         return (entityDefaultLocation, playerBornLocation) -> {
-            doConsume();
-            doProduce();
-            return this.narration;
+            String result = this.narration;
+            doConsume(player, entityDefaultLocation);
+            doProduce(player);
+            if (player.getHealth() <= 0) {
+                player.dropInventory();
+                player.getLocation().removeLocatedEntity(player);
+                playerBornLocation.addLocatedEntity(player);
+                player.resetHealth();
+                result += "\nyou died, lost your artefacts, and reborn at " + playerBornLocation.getName();
+            }
+            return result;
         };
     }
 
@@ -78,9 +86,43 @@ public class GameAction implements Command {
         });
     }
 
-    private void doConsume() {}
+    private void doConsume(Player player, Location entityDefaultLocation) {
+        this.consumed.forEach((entity) -> {
+            if (entity instanceof Location) {
+                player.getLocation().removePathTo((Location)entity);
+                return;
+            }
+            LocatedEntity locatedEntity = (LocatedEntity) entity;
+            freeEntity(locatedEntity);
+            entityDefaultLocation.addLocatedEntity(locatedEntity);
+        });
+        player.decreaseHealth(this.consumedHealth);
+    }
 
-    private void doProduce() {}
+    private void doProduce(Player player) {
+        this.produced.forEach((entity) -> {
+            if (entity instanceof Location) {
+                player.getLocation().addPathTo((Location)entity);
+                return;
+            }
+            LocatedEntity locatedEntity = (LocatedEntity) entity;
+            freeEntity(locatedEntity);
+            player.getLocation().addLocatedEntity(locatedEntity);
+        });
+        player.increaseHealth(this.producedHealth);
+    }
+
+    private static void freeEntity(LocatedEntity entity) {
+        if (entity.getLocation() != null) {
+            entity.getLocation().removeLocatedEntity(entity);
+        }
+        if (entity instanceof Artefact) {
+            Artefact artefact = (Artefact) entity;
+            if (artefact.getOwner() != null) {
+                artefact.getOwner().removeArtefact(artefact);
+            }
+        }
+    }
 
     @Override
     public String toString() {
