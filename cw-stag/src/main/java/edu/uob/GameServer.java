@@ -44,8 +44,8 @@ public final class GameServer {
     private Location playerBornLocation;
 
     public static void main(String[] args) throws IOException {
-        File entitiesFile = Paths.get("config" + File.separator + "extended-entities.dot").toAbsolutePath().toFile();
-        File actionsFile = Paths.get("config" + File.separator + "extended-actions.xml").toAbsolutePath().toFile();
+        File entitiesFile = Paths.get("config" + File.separator + "basic-entities.dot").toAbsolutePath().toFile();
+        File actionsFile = Paths.get("config" + File.separator + "basic-actions.xml").toAbsolutePath().toFile();
         GameServer server = new GameServer(entitiesFile, actionsFile);
         server.blockingListenOn(8888);
     }
@@ -74,8 +74,8 @@ public final class GameServer {
         if (this.playerBornLocation == null) {
             this.playerBornLocation = this.entityDefaultLocation;
         }
-        printEntities(); // For debug.
-        printCommands(); // For debug.
+        // printEntities(); // For debug.
+        // printCommands(); // For debug.
     }
 
     private void addCommands(Command[] commands) {
@@ -252,7 +252,7 @@ public final class GameServer {
         return String.join(" ", str.trim().split("\\s+"));
     }
 
-    private static String replacStandardPunctuation(String str) {
+    private static String replaceStandardPunctuation(String str) {
         final char charSpace = ' ';
         final String standardPunctuations = ",.!?";
         for (int i = 0; i < standardPunctuations.length(); ++i) {
@@ -402,7 +402,7 @@ public final class GameServer {
 
     private List<GameEntity> getSubjectsFromPlayerCommand(String playerCommand) {
         List<GameEntity> entities = new ArrayList<GameEntity>();
-        String[] wordArray = replacStandardPunctuation(playerCommand).trim().split("\\s+");
+        String[] wordArray = replaceStandardPunctuation(playerCommand).trim().split("\\s+");
         for (String name : new HashSet<String>(Arrays.asList(wordArray))) {
             GameEntity entity = getEntity(name);
             if (entity != null) {
@@ -414,7 +414,7 @@ public final class GameServer {
 
     private Set<Command> getCandidateCommandsFromPlayerCommand(String playerCommandSquashed) {
         Set<Command> candidateCommands = new HashSet<Command>();
-        String playerCommandWordsSeparate = " " + replacStandardPunctuation(playerCommandSquashed) + " ";
+        String playerCommandWordsSeparate = " " + replaceStandardPunctuation(playerCommandSquashed) + " ";
         for (Map.Entry<String, List<Command>> entry : this.commands.entrySet()) {
             String trigger = entry.getKey();
             if (playerCommandSquashed.contains(trigger) && playerCommandWordsSeparate.contains(" " + trigger + " ")) {
