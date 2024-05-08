@@ -45,10 +45,6 @@ public class Player extends Character {
         return artefact != null && this.inventory.get(artefact.getName()) == artefact;
     }
 
-    public boolean ownsEntity(GameEntity entity) {
-        return (entity instanceof Artefact) && ownsArtefact((Artefact)entity);
-    }
-
     public int getHealth() {
         return this.health;
     }

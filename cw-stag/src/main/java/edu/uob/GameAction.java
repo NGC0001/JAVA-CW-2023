@@ -69,7 +69,11 @@ public class GameAction implements Command {
 
     private boolean allSubjectsAvailableForPlayer(Player player) {
         return this.subjects.stream().allMatch((entity) -> {
-            return player.getLocation().containsOrHasPathTo(entity) || player.ownsEntity(entity);
+            if (entity instanceof Location) {
+                return player.getLocation() == entity;
+            }
+            return player.getLocation().containsLocatedEntity((LocatedEntity) entity) ||
+                    (entity instanceof Artefact && player.ownsArtefact((Artefact) entity));
         });
     }
 

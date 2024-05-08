@@ -59,16 +59,6 @@ public class Location extends GameEntity {
         return containsEntity(destination);
     }
 
-    public boolean containsOrHasPathTo(GameEntity entity) {
-        if (entity instanceof LocatedEntity) {
-            return containsLocatedEntity((LocatedEntity)entity);
-        }
-        if (entity instanceof Location) {
-            return hasPathToLocation((Location)entity);
-        }
-        return false;
-    }
-
     public void printEntities() {
         System.out.println(toString());
         this.entities.forEach((name, entity) -> {
