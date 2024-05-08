@@ -48,7 +48,7 @@ class STAGTests {
         assertSuccess(response);
         response = sendCommandToServer("simon: Get Potion");
         assertFailure(response);
-        response = sendCommandToServer("simon: Drop Potion");
+        response = sendCommandToServer("simon: simon Drop Potion potion");
         assertSuccess(response);
         response = sendCommandToServer("simon: drop potion");
         assertFailure(response);
