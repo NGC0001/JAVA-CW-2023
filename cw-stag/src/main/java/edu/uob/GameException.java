@@ -1,6 +1,8 @@
 package edu.uob;
 
 import java.io.Serial;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public abstract class GameException extends Exception {
     @Serial
@@ -19,12 +21,23 @@ public abstract class GameException extends Exception {
         }
     }
 
+    public static class InvalidPlayerNameException extends GameException {
+        @Serial
+        private static final long serialVersionUID = 1;
+
+        public InvalidPlayerNameException(String playerName) {
+            super("invalid player name \"" + playerName + "\"");
+        }
+    }
+
     public static class AmbiguousCommandException extends GameException {
         @Serial
         private static final long serialVersionUID = 1;
 
-        public AmbiguousCommandException() {
-            super("ambiguous command");
+        public AmbiguousCommandException(Command... commands) {
+            super("ambiguous command at least matching\n" + String.join("\n",
+                    Arrays.asList(commands).stream().map(cmd -> "  " + cmd.toString()).collect(Collectors.toList())
+            ));
         }
     }
 

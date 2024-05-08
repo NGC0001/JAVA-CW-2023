@@ -44,8 +44,8 @@ public final class GameServer {
     private Location playerBornLocation;
 
     public static void main(String[] args) throws IOException {
-        File entitiesFile = Paths.get("config" + File.separator + "basic-entities.dot").toAbsolutePath().toFile();
-        File actionsFile = Paths.get("config" + File.separator + "basic-actions.xml").toAbsolutePath().toFile();
+        File entitiesFile = Paths.get("config" + File.separator + "extended-entities.dot").toAbsolutePath().toFile();
+        File actionsFile = Paths.get("config" + File.separator + "extended-actions.xml").toAbsolutePath().toFile();
         GameServer server = new GameServer(entitiesFile, actionsFile);
         server.blockingListenOn(8888);
     }
@@ -242,10 +242,24 @@ public final class GameServer {
                 if (text == null) {
                     continue;
                 }
-                result.add(text.trim().toLowerCase());
+                result.add(squashSpace(text));
             }
         }
         return result;
+    }
+
+    private static String squashSpace(String str) {
+        return String.join(" ", str.trim().split("\\s+"));
+    }
+
+    private static String replacStandardPunctuation(String str) {
+        final char charSpace = ' ';
+        final String standardPunctuations = ",.!?";
+        for (int i = 0; i < standardPunctuations.length(); ++i) {
+            char punctuation = standardPunctuations.charAt(i);
+            str = str.replace(punctuation, charSpace);
+        }
+        return str;
     }
 
     private static int pickoutStringFromList(List<String> list, String word) {
@@ -286,7 +300,10 @@ public final class GameServer {
         if (defaultLocationName.equals(entityName) && !(entity instanceof Location)) {
             return false;
         }
-        if (this.commands.containsKey(entityName)) { // entity name shouldn't be an existing trigger
+        if (this.commands.containsKey(entityName)) {
+            // entity name shouldn't be an existing trigger
+            // NOTE: not able to exclude subwords of a trigger phrase
+            // e.g., if "cut down" is a trigger, "down" can still be a entity name
             return false;
         }
         return this.entities.putIfAbsent(entityName, entity) == null; // entity name should be unique
@@ -319,22 +336,27 @@ public final class GameServer {
     */
     public String handleCommand(String command) {
         try {
-            String[] playerNameAndCommand = command.toLowerCase().split(":", 2);
+            String[] playerNameAndCommand = command.split(":", 2);
             if (playerNameAndCommand.length != 2) {
                 throw new GameException.InvalidCommandFormatException();
             }
-            String playerName = playerNameAndCommand[0].trim();
+            String playerName = playerNameAndCommand[0];
+            String playerCommand = squashSpace(playerNameAndCommand[1].toLowerCase());
+            if (!isValidPlayerName(playerName)) {
+                throw new GameException.InvalidPlayerNameException(playerName);
+            }
             Player player = getOrCreatePlayer(playerName);
-            List<String> playerCommand = Arrays.asList(playerNameAndCommand[1].trim().split("\\s+"));
             List<GameEntity> subjects = getSubjectsFromPlayerCommand(playerCommand);
+            Command matchedCommand = null;
             Task matchedTask = null;
             for (Command cmd : getCandidateCommandsFromPlayerCommand(playerCommand)) {
                 Task task = cmd.buildTask(player, subjects);
                 if (task == null) { continue; }
                 if (matchedTask != null) {
-                    throw new GameException.AmbiguousCommandException();
+                    throw new GameException.AmbiguousCommandException(matchedCommand, cmd);
                 }
                 matchedTask = task;
+                matchedCommand = cmd;
             }
             if (matchedTask == null) {
                 throw new GameException.NoMatchingCommandException();
@@ -356,9 +378,32 @@ public final class GameServer {
         return player;
     }
 
-    private List<GameEntity> getSubjectsFromPlayerCommand(Collection<String> playerCommand) {
+    private static boolean isValidPlayerName(String playerName) {
+        for (int i = 0; i < playerName.length(); ++i) {
+            if (!isValidPlayerNameChar(playerName.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isValidPlayerNameChar(char ch) {
+        if ('a' <= ch && ch <= 'z') {
+            return true;
+        }
+        if ('A' <= ch && ch <= 'Z') {
+            return true;
+        }
+        if (ch == '\'' || ch == '-' || ch == ' ') {
+            return true;
+        }
+        return false;
+    }
+
+    private List<GameEntity> getSubjectsFromPlayerCommand(String playerCommand) {
         List<GameEntity> entities = new ArrayList<GameEntity>();
-        for (String name : new HashSet<String>(playerCommand)) {
+        String[] wordArray = replacStandardPunctuation(playerCommand).trim().split("\\s+");
+        for (String name : new HashSet<String>(Arrays.asList(wordArray))) {
             GameEntity entity = getEntity(name);
             if (entity != null) {
                 entities.add(entity);
@@ -367,12 +412,13 @@ public final class GameServer {
         return entities;
     }
 
-    private Set<Command> getCandidateCommandsFromPlayerCommand(Collection<String> playerCommand) {
+    private Set<Command> getCandidateCommandsFromPlayerCommand(String playerCommandSquashed) {
         Set<Command> candidateCommands = new HashSet<Command>();
-        for (String trigger : playerCommand) {
-            List<Command> commands = this.commands.get(trigger);
-            if (commands != null) {
-                candidateCommands.addAll(commands);
+        String playerCommandWordsSeparate = " " + replacStandardPunctuation(playerCommandSquashed) + " ";
+        for (Map.Entry<String, List<Command>> entry : this.commands.entrySet()) {
+            String trigger = entry.getKey();
+            if (playerCommandSquashed.contains(trigger) && playerCommandWordsSeparate.contains(" " + trigger + " ")) {
+                candidateCommands.addAll(entry.getValue());
             }
         }
         return candidateCommands;
