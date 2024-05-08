@@ -123,4 +123,13 @@ class STAGTests {
         response = sendCommandToServer("simon: open trapdoor");
         assertFailure(response);
     }
+
+    @Test
+    void testPunctuation() {
+        String response;
+        response = sendCommandToServer("simon:hi,look!");
+        assertSuccess(response);
+        response = sendCommandToServer("simon:hi,look.inv");
+        assertFailure(response);
+    }
 }
